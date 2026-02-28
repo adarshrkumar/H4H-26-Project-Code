@@ -1,6 +1,21 @@
 import { mutation, query } from './_generated/server';
 import { v } from 'convex/values';
 
+export const generateUploadUrl = mutation({
+    args: {},
+    returns: v.string(),
+    handler: async (ctx) => {
+        return await ctx.storage.generateUploadUrl();
+    },
+});
+
+export const getFileUrl = query({
+    args: { storageId: v.id('_storage') },
+    handler: async (ctx, args) => {
+        return await ctx.storage.getUrl(args.storageId);
+    },
+});
+
 export const listTracks = query({
     args: {
         artist: v.optional(v.string()),
@@ -26,7 +41,7 @@ export const createTrack = mutation({
         artist: v.optional(v.string()),
         album: v.optional(v.string()),
         duration: v.optional(v.number()),
-        storageId: v.optional(v.string()),
+        storageId: v.optional(v.id('_storage')),
         mimeType: v.string(),
     },
     handler: async (ctx, args) => {
@@ -45,7 +60,7 @@ export const updateTrack = mutation({
         artist: v.optional(v.string()),
         album: v.optional(v.string()),
         duration: v.optional(v.number()),
-        storageId: v.optional(v.string()),
+        storageId: v.optional(v.id('_storage')),
     },
     handler: async (ctx, args) => {
         const { id, ...updates } = args;
