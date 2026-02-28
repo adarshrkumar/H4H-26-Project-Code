@@ -8,13 +8,13 @@ import IndexScript from './IndexScript.astro';
     <h1>Audio to Color</h1>
 
     <div id="mode-tabs">
-        <button class="tab active" data-mode="file">File</button>
+        <button class="tab" data-state="active" data-mode="file">File</button>
         <button class="tab" data-mode="speaker">Speaker / Tab</button>
         <button class="tab" data-mode="microphone">Microphone</button>
     </div>
 
     <div id="controls">
-        <div id="ctrl-file" class="ctrl-panel active">
+        <div id="ctrl-file" class="ctrl-panel" data-state="active">
             <label for="audioFile">Audio file</label>
             <input type="file" id="audioFile" accept="audio/*" />
         </div>
