@@ -31,7 +31,9 @@ import { METRICS } from '@/lib/metrics';
 
     <canvas id="colorCanvas" class="color-canvas" width="660" height="340"></canvas>
 
-    <div id="instrument-label" class="instrument-label">—</div>
+    <div id="instrument-results" class="instrument-results">
+        <p class="instrument-status">—</p>
+    </div>
 
     <div id="metrics" class="metrics">
         {METRICS.map(({ key, label }) => (

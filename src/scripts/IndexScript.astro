@@ -19,14 +19,14 @@
     const CLASSIFY_EVERY_MS = 3000;  // run inference at most every 3 s
     const PCM_16K_LEN       = 48000; // 3 s at 16 kHz
 
-    const pcm16k             = new Float32Array(PCM_16K_LEN);
-    let   pcmPos             = 0;
-    let   pcmCount           = 0;
+    const pcm16k                  = new Float32Array(PCM_16K_LEN);
+    let   pcmPos                  = 0;
+    let   pcmCount                = 0;
     let   classifierPipeline: any = null;
-    let   classifierReady    = false;
-    let   classifierLoading  = false;
-    let   classifying        = false;
-    let   lastClassifyTime   = 0;
+    let   classifierReady         = false;
+    let   classifierLoading       = false;
+    let   classifying             = false;
+    let   lastClassifyTime        = 0;
 
     const instrumentLabel = document.getElementById('instrument-label') as HTMLElement;
 
