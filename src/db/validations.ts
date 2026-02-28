@@ -6,6 +6,9 @@ export const createTrackSchema = z.object({
     album: z.string().max(255).optional().nullable(),
     duration: z.number().positive().optional().nullable(),
     storageId: z.string().optional().nullable(),
+    uploadThingKey: z.string().optional().nullable(),
+    uploadThingUrl: z.string().url().optional().nullable(),
+    source: z.string().max(255).optional().nullable(),
     mimeType: z.string().min(1, 'MIME type is required'),
 });
 
