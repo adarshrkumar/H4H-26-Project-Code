@@ -863,7 +863,8 @@
         }
 
         canvasCtx.restore();
-        updateMetricBars(features as unknown as Record<string, number>);
+        const { isBeat: _isBeat, ...numericFeatures } = features;
+        updateMetricBars(numericFeatures);
     }
 
     initClassifier();
