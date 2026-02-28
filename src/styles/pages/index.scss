@@ -1,80 +1,20 @@
-@use '../variables/globals' as *;
-@use '../variables/mixins' as *;
+// Audio to Color — page styles
 
-// Home page styles
-.home {
-    padding: $spacing-3x-large 0;
+body {
+    font-family: system-ui, sans-serif;
+    min-height: 100vh;
+    background-color: #0f0f1a;
+    color: #e0e0e0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 40px;
+    gap: 18px;
+}
 
-    &__header {
-        text-align: center;
-        margin-bottom: $spacing-3x-large;
-    }
-
-    &__title {
-        @include heading-1;
-        margin-inline: auto;
-        margin-bottom: $spacing-medium;
-        background: linear-gradient(135deg, $primary-color 0%, $secondary-color 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-    }
-
-    &__subtitle {
-        font-size: $font-size-large;
-        color: $text-secondary;
-        max-width: 600px;
-        margin: 0 auto;
-
-        @include desktop {
-            font-size: $font-size-extra-large;
-        }
-    }
-
-    &__features {
-        display: grid;
-        grid-template-columns: 1fr;
-        gap: $spacing-large;
-        margin-bottom: $spacing-3x-large;
-
-        @include tablet {
-            grid-template-columns: repeat(2, 1fr);
-        }
-
-        @include wide {
-            grid-template-columns: repeat(3, 1fr);
-        }
-    }
-
-    &__feature {
-        h3 {
-            font-size: $font-size-extra-large;
-            font-weight: $font-weight-semibold;
-            margin-bottom: $spacing-small;
-            color: $text-primary;
-        }
-
-        p {
-            font-size: $font-size-base;
-            color: $text-secondary;
-            margin-bottom: 0;
-        }
-    }
-
-    &__cta {
-        text-align: center;
-        padding: $spacing-3x-large 0;
-        border-top: 1px solid $border-color;
-
-        h2 {
-            @include heading-2;
-            margin-bottom: $spacing-extra-large;
-        }
-    }
-
-    &__cta-buttons {
-        @include flex-center;
-        gap: $spacing-large;
-        flex-wrap: wrap;
-    }
+h1 {
+    font-size: 1.7rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: #fff;
 }
