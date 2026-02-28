@@ -34,7 +34,7 @@ const newPageTitle = (pageArray && pageArray.length > 0 && firstElement)
         : pageArray
     : null;
 
-const title = newPageTitle ? `${newPageTitle.join(' | ')} | ${siteConfig.name}` : siteConfig.name;
+const title = (newPageTitle && newPageTitle.length > 0) ? `${newPageTitle.join(' | ')} | ${siteConfig.name}` : siteConfig.name;
 ---
 
 <!doctype html>

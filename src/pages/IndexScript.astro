@@ -331,140 +331,33 @@
 
     type Features = ReturnType<typeof getAudioFeatures>;
 
-    function getMood(f: Features): string {
-        if (f.energy < MIN_THRESHOLD) return 'silent';
+    function metricsToColor(f: Features): { l: number; c: number; h: number } {
+        if (f.energy < MIN_THRESHOLD) return { l: 93, c: 0, h: 0 };
 
-        // Base: energy × brightness
-        let mood: string;
-        if (f.energy < 0.35) {
-            mood = f.brightness < 0.38 ? 'melancholic' : f.brightness < 0.65 ? 'peaceful' : 'serene';
-        } else if (f.energy < 0.60) {
-            mood = f.brightness < 0.38 ? 'tense' : f.brightness < 0.65 ? 'focused' : 'uplifting';
-        } else {
-            mood = f.brightness < 0.38 ? 'angry' : f.brightness < 0.65 ? 'powerful' : 'excited';
-        }
+        // Hue: pitch-based when tonal, brightness-based when atonal/noisy
+        // dominantPitch 0–1 spans C→B across the full hue circle
+        // brightness 0–1 spans warm→cool (0°→280°) as a fallback
+        const pitchHue      = f.dominantPitch * 360;
+        const brightnessHue = f.brightness * 280;
+        const h = (pitchHue * f.chromaStrength + brightnessHue * (1 - f.chromaStrength)) % 360;
 
-        // Volume extremes
-        if (f.energy > 0.80) {
-            const m: Record<string, string> = { peaceful: 'uplifting', serene: 'excited', focused: 'powerful', uplifting: 'excited', melancholic: 'tense', tranquil: 'peaceful', meditative: 'serene', hopeful: 'uplifting', somber: 'melancholic', contemplative: 'focused', brooding: 'tense', heavy: 'powerful', giddy: 'excited' };
-            mood = m[mood] ?? mood;
-        } else if (f.energy < 0.22) {
-            const m: Record<string, string> = { angry: 'tense', powerful: 'focused', excited: 'uplifting', furious: 'angry', intense: 'powerful', frantic: 'tense', driven: 'focused', restless: 'melancholic', joyful: 'peaceful', playful: 'peaceful', euphoric: 'serene' };
-            mood = m[mood] ?? mood;
-        }
+        // Chroma (saturation): harmonic, high-contrast audio is vivid; noise is grey
+        // Roughness and flatness desaturate
+        const c = Math.min(0.37,
+            (f.harmonicRatio * 0.20 + f.chromaStrength * 0.12 + f.spectralContrast * 0.10)
+            * (1 - f.flatness * 0.4)
+            * (1 - f.roughness * 0.3)
+        );
 
-        // Tempo
-        if (f.tempo > 0.65) {
-            const m: Record<string, string> = { melancholic: 'restless', peaceful: 'playful', serene: 'joyful', tense: 'frantic', focused: 'driven', uplifting: 'euphoric', angry: 'furious', powerful: 'intense', excited: 'euphoric' };
-            mood = m[mood] ?? mood;
-        } else if (f.tempo > 0 && f.tempo < 0.25) {
-            const m: Record<string, string> = { melancholic: 'somber', peaceful: 'tranquil', serene: 'meditative', tense: 'brooding', focused: 'contemplative', uplifting: 'hopeful', angry: 'smoldering', powerful: 'heavy', excited: 'giddy' };
-            mood = m[mood] ?? mood;
-        }
+        // Lightness: perceptual loudness (RMS) as the primary driver
+        // Sub-bass darkens slightly; high frequencies brighten slightly
+        const l = Math.min(85, Math.max(10,
+            15 + f.rms * 65
+            - f.subBass * 8
+            + f.highRatio * 6
+        ));
 
-        // Flux / drone
-        if (f.flux < 0.05 && f.energy > 0.12) {
-            const m: Record<string, string> = { melancholic: 'somber', peaceful: 'meditative', serene: 'meditative', tense: 'brooding', focused: 'contemplative', uplifting: 'hopeful', angry: 'smoldering', powerful: 'heavy', excited: 'giddy', restless: 'brooding', frantic: 'tense', driven: 'focused', euphoric: 'serene', furious: 'angry', intense: 'powerful' };
-            mood = m[mood] ?? mood;
-        }
-
-        // Spectral spread
-        if (f.spread > 0.55 && f.energy > 0.40) {
-            const m: Record<string, string> = { focused: 'powerful', tense: 'frantic', uplifting: 'excited', peaceful: 'uplifting', melancholic: 'tense', contemplative: 'focused', tranquil: 'peaceful' };
-            mood = m[mood] ?? mood;
-        }
-
-        // Bass-heavy
-        if (f.bassRatio > 0.30 && f.energy > 0.25) {
-            const m: Record<string, string> = { uplifting: 'focused', excited: 'powerful', joyful: 'driven', playful: 'restless', hopeful: 'contemplative', giddy: 'restless', euphoric: 'intense', serene: 'peaceful', tranquil: 'somber' };
-            mood = m[mood] ?? mood;
-        }
-
-        // Noisy (flatness + zcr)
-        if (f.flatness > 0.70 && f.zcr > 0.15 && f.energy > 0.15) {
-            const m: Record<string, string> = { peaceful: 'restless', serene: 'uplifting', tranquil: 'peaceful', meditative: 'contemplative', somber: 'brooding', hopeful: 'focused', contemplative: 'tense' };
-            mood = m[mood] ?? mood;
-        }
-
-        // Percussive / transient
-        if (f.crestFactor > 0.65 && f.attackTime > 0.50) {
-            const m: Record<string, string> = { peaceful: 'playful', serene: 'joyful', melancholic: 'restless', focused: 'driven', tense: 'frantic', uplifting: 'euphoric', contemplative: 'focused', somber: 'brooding' };
-            mood = m[mood] ?? mood;
-        }
-
-        // Rough / dissonant
-        if (f.roughness > 0.60 && f.energy > 0.20) {
-            const m: Record<string, string> = { peaceful: 'tense', serene: 'tense', melancholic: 'brooding', focused: 'tense', uplifting: 'excited', tranquil: 'melancholic', hopeful: 'contemplative', meditative: 'somber', joyful: 'restless', playful: 'restless' };
-            mood = m[mood] ?? mood;
-        }
-
-        // Strong harmonic content → tonal/melodic
-        if (f.harmonicRatio > 0.35 && f.roughness < 0.30) {
-            const m: Record<string, string> = { tense: 'focused', angry: 'powerful', frantic: 'driven', restless: 'peaceful', brooding: 'melancholic', smoldering: 'tense', heavy: 'powerful' };
-            mood = m[mood] ?? mood;
-        }
-
-        // Groovy: regular beat + fast tempo
-        if (f.beatRegularity > 0.75 && f.tempo > 0.55) {
-            const m: Record<string, string> = { focused: 'driven', uplifting: 'euphoric', powerful: 'intense', excited: 'euphoric', peaceful: 'playful', joyful: 'euphoric', driven: 'euphoric' };
-            mood = m[mood] ?? mood;
-        }
-
-        // Sub-bass heavy → heavy/deep
-        if (f.subBass > 0.25 && f.energy > 0.30) {
-            const m: Record<string, string> = { uplifting: 'powerful', excited: 'intense', joyful: 'driven', peaceful: 'focused', hopeful: 'contemplative', playful: 'restless', euphoric: 'intense' };
-            mood = m[mood] ?? mood;
-        }
-
-        // High-frequency dominant → airy/bright
-        if (f.highRatio > 0.20 && f.energy > 0.15) {
-            const m: Record<string, string> = { melancholic: 'serene', somber: 'contemplative', brooding: 'focused', heavy: 'tense', smoldering: 'brooding', tranquil: 'serene', meditative: 'serene' };
-            mood = m[mood] ?? mood;
-        }
-
-        // Strong tonal coherence (tonnetz) → resolved/consonant
-        if (f.tonnetz > 0.60 && f.harmonicRatio > 0.20) {
-            const m: Record<string, string> = { tense: 'focused', angry: 'tense', frantic: 'restless', brooding: 'melancholic', heavy: 'powerful' };
-            mood = m[mood] ?? mood;
-        }
-
-        return mood;
-    }
-
-    const MOOD_PALETTE: Record<string, { hue: number; chroma: number; baseL: number }> = {
-        silent:        { hue: 0,   chroma: 0,    baseL: 93 },
-        melancholic:   { hue: 248, chroma: 0.12, baseL: 28 },
-        peaceful:      { hue: 205, chroma: 0.11, baseL: 50 },
-        serene:        { hue: 175, chroma: 0.13, baseL: 58 },
-        tense:         { hue: 22,  chroma: 0.18, baseL: 36 },
-        focused:       { hue: 128, chroma: 0.10, baseL: 38 },
-        uplifting:     { hue: 72,  chroma: 0.18, baseL: 52 },
-        angry:         { hue: 348, chroma: 0.21, baseL: 40 },
-        powerful:      { hue: 25,  chroma: 0.22, baseL: 44 },
-        excited:       { hue: 48,  chroma: 0.25, baseL: 56 },
-        restless:      { hue: 35,  chroma: 0.20, baseL: 45 },
-        playful:       { hue: 80,  chroma: 0.22, baseL: 58 },
-        joyful:        { hue: 55,  chroma: 0.24, baseL: 62 },
-        frantic:       { hue: 10,  chroma: 0.24, baseL: 42 },
-        driven:        { hue: 150, chroma: 0.15, baseL: 42 },
-        euphoric:      { hue: 300, chroma: 0.24, baseL: 58 },
-        furious:       { hue: 0,   chroma: 0.28, baseL: 30 },
-        intense:       { hue: 20,  chroma: 0.26, baseL: 38 },
-        somber:        { hue: 230, chroma: 0.13, baseL: 20 },
-        tranquil:      { hue: 200, chroma: 0.08, baseL: 65 },
-        meditative:    { hue: 185, chroma: 0.09, baseL: 45 },
-        brooding:      { hue: 270, chroma: 0.11, baseL: 25 },
-        contemplative: { hue: 250, chroma: 0.09, baseL: 40 },
-        hopeful:       { hue: 45,  chroma: 0.15, baseL: 55 },
-        smoldering:    { hue: 10,  chroma: 0.16, baseL: 25 },
-        heavy:         { hue: 30,  chroma: 0.14, baseL: 28 },
-        giddy:         { hue: 320, chroma: 0.19, baseL: 60 },
-    };
-
-    function moodToColor(mood: string, energy: number): { color: string; l: number; c: number; h: number } {
-        const base = MOOD_PALETTE[mood] ?? MOOD_PALETTE['focused'];
-        const l    = Math.min(85, Math.max(10, base.baseL + (energy - 0.5) * 30));
-        return { color: `oklch(${Math.round(l)}% ${base.chroma} ${base.hue})`, l, c: base.chroma, h: base.hue };
+        return { l, c, h };
     }
 
     const METRICS = [
@@ -517,7 +410,6 @@
 
     const canvas          = document.getElementById('colorCanvas') as HTMLCanvasElement;
     const canvasCtx       = canvas.getContext('2d')!;
-    const moodDisplay     = document.getElementById('mood')!;
     const audioFileInput  = document.getElementById('audioFile') as HTMLInputElement;
     const speakerStartBtn = document.getElementById('speakerStartBtn') as HTMLButtonElement;
     const speakerStopBtn  = document.getElementById('speakerStopBtn') as HTMLButtonElement;
@@ -598,7 +490,6 @@
         micStartBtn.disabled     = false;
         micStopBtn.disabled      = true;
 
-        moodDisplay.textContent = '';
         lchHistory.length = 0;
         _state.energyHistory.length = 0;
         resetCanvas();
@@ -713,7 +604,6 @@
         if (!analyser || (!bufferSource && !sourceNode)) {
             if (animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
             resetCanvas();
-            moodDisplay.textContent = '';
             resetMetricBars();
             return;
         }
@@ -723,9 +613,8 @@
         analyser.getByteFrequencyData(dataArray!);
         analyser.getByteTimeDomainData(timeDomainArray!);
 
-        const features = getAudioFeatures(dataArray!, timeDomainArray!);
-        const mood     = getMood(features);
-        const { l, c, h } = moodToColor(mood, features.energy);
+        const features    = getAudioFeatures(dataArray!, timeDomainArray!);
+        const { l, c, h } = metricsToColor(features);
 
         lchHistory.push({ l, c, h });
         if (lchHistory.length > NUM_HISTORY) lchHistory.shift();
@@ -738,7 +627,6 @@
         canvasCtx.fillStyle = `oklch(${Math.round(avgL)}% ${avgC.toFixed(3)} ${Math.round(avgH)})`;
         canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
 
-        moodDisplay.textContent = mood;
         updateMetricBars(features);
     }
 </script>
