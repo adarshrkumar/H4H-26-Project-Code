@@ -19,7 +19,7 @@ h1 {
     color: #fff;
 }
 
-/* ── Mode tabs ── */
+// Mode Tabs
 #mode-tabs {
     display: flex;
     gap: 6px;
@@ -50,7 +50,7 @@ h1 {
     font-weight: 600;
 }
 
-/* ── Controls area ── */
+// Controls Area
 #controls {
     display: flex;
     align-items: center;
@@ -94,7 +94,7 @@ h1 {
 .btn.stop { background-color: #333; }
 .btn.stop:hover:not(:disabled) { background-color: #444; }
 
-/* ── Canvas ── */
+// Canvas
 #colorCanvas {
     width: min(100%, 660px);
     height: 280px;
@@ -104,7 +104,7 @@ h1 {
     display: block;
 }
 
-/* ── Mood label ── */
+// Mood Label
 #mood {
     font-size: 1.35rem;
     font-weight: 600;
@@ -115,3 +115,61 @@ h1 {
     opacity: 0.9;
     margin-bottom: 0;
 }
+
+// Metrics Panel
+#metrics {
+    width: min(100%, 660px);
+    background-color: #1a1a30;
+    border-radius: 12px;
+    padding: 16px 20px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 28px;
+}
+
+@media (max-width: 480px) {
+    #metrics { grid-template-columns: 1fr; }
+}
+
+.metric-row {
+    display: grid;
+    grid-template-columns: 82px 1fr 38px;
+    align-items: center;
+    gap: 8px;
+}
+
+.metric-label {
+    font-size: 0.76rem;
+    color: #999;
+    white-space: nowrap;
+}
+
+.metric-track {
+    height: 5px;
+    background-color: #2a2a4a;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.metric-bar {
+    height: 100%;
+    width: 0%;
+    border-radius: 3px;
+    transition: width 0.07s linear;
+}
+
+.metric-value {
+    font-size: 0.72rem;
+    font-family: monospace;
+    color: #bbb;
+    text-align: right;
+}
+
+#bar-energy     { background-color: #ff8c00; }
+#bar-brightness { background-color: #00bfff; }
+#bar-tempo      { background-color: #3ddc84; }
+#bar-flux       { background-color: #b07dff; }
+#bar-spread     { background-color: #20c8b8; }
+#bar-flatness   { background-color: #ff6eb4; }
+#bar-bassRatio  { background-color: #ff4444; }
+#bar-zcr        { background-color: #b8ff2f; }
