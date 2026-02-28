@@ -10,9 +10,7 @@ export const siteConfig = {
     // Short name for the stack (used in PWA and compact displays)
     stackShortName: STACK_SHORT_NAME,
 
-    /**
-     * The full name of the stack/framework (derived from stackShortName)
-     */
+    // The full name of the stack/framework (derived from stackShortName)
     stackName: `${STACK_SHORT_NAME} Stack`,
 
     // Full description of the stack
