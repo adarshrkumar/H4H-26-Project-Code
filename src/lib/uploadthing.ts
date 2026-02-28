@@ -14,14 +14,9 @@ export async function uploadFileByUrl(url: string) {
     return fileKey;
 }
 
-// getFile
-export async function getFile(fileKey: string) {
-    return await utapi.getFiles(fileKey);
-}
-
 // getFileUrl
-export async function getFileUrl(fileKey: string) {
-    return await utapi.getFileUrls([fileKey]);
+export function getFileUrl(fileKey: string) {
+    return `https://utfs.io/f/${fileKey}`;
 }
 
 // deleteFile
