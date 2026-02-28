@@ -104,6 +104,23 @@ h1 {
     display: block;
 }
 
+// Instrument Label
+.instrument-label {
+    width: min(100%, 660px);
+    background-color: #1a1a30;
+    border-radius: 10px;
+    padding: 10px 20px;
+    font-size: 0.88rem;
+    color: #e0e0e0;
+    text-align: center;
+    letter-spacing: 0.04em;
+
+    &[data-state="loading"] { color: #888; font-style: italic; }
+    &[data-state="ready"]   { color: #3ddc84; }
+    &[data-state="result"]  { color: #fff; font-weight: 600; }
+    &[data-state="error"]   { color: #e94560; font-style: italic; }
+}
+
 // Metrics Panel
 .metrics {
     width: min(100%, 660px);
