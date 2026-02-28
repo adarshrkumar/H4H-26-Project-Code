@@ -28,7 +28,11 @@
     let   classifying             = false;
     let   lastClassifyTime        = 0;
 
-    const instrumentLabel = document.getElementById('instrument-label') as HTMLElement;
+    const instrumentResults = document.getElementById('instrument-results') as HTMLElement;
+
+    function setInstrumentStatus(text: string, state: string) {
+        instrumentResults.innerHTML = `<p class="instrument-status" data-state="${state}">${text}</p>`;
+    }
 
     function downsampleChunk(input: Uint8Array, srcSR: number): Float32Array {
         const ratio  = srcSR / 16000;
@@ -65,18 +69,15 @@
     async function initClassifier() {
         if (classifierReady || classifierLoading) return;
         classifierLoading = true;
-        instrumentLabel.dataset.state = 'loading';
-        instrumentLabel.textContent   = 'Loading instrument model…';
+        setInstrumentStatus('Loading instrument model…', 'loading');
         try {
             const { pipeline } = await import('@huggingface/transformers');
             classifierPipeline = await pipeline('audio-classification', INSTRUMENT_MODEL, { dtype: 'q8' });
             classifierReady    = true;
-            instrumentLabel.dataset.state = 'ready';
-            instrumentLabel.textContent   = 'Model ready — listening…';
+            setInstrumentStatus('Model ready — listening…', 'ready');
         } catch (err) {
             console.error('Instrument model failed to load:', err);
-            instrumentLabel.dataset.state = 'error';
-            instrumentLabel.textContent   = 'Model unavailable (see console)';
+            setInstrumentStatus('Model unavailable (see console)', 'error');
         } finally {
             classifierLoading = false;
         }
@@ -87,10 +88,14 @@
         classifying = true;
         try {
             const audio  = getRecentPCM();
-            const result = await classifierPipeline(audio);
-            const top    = result[0] as { label: string; score: number };
-            instrumentLabel.dataset.state = 'result';
-            instrumentLabel.textContent   = `${top.label}  ${(top.score * 100).toFixed(0)}%`;
+            const result = await classifierPipeline(audio, { topk: null }) as { label: string; score: number }[];
+            instrumentResults.innerHTML = result.map(({ label, score }) => `
+                <div class="instr-row">
+                    <span class="instr-label">${label}</span>
+                    <div class="instr-track"><div class="instr-bar" style="width:${(score * 100).toFixed(2)}%"></div></div>
+                    <span class="instr-value">${(score * 100).toFixed(1)}%</span>
+                </div>
+            `).join('');
         } catch (err) {
             console.error('Classification error:', err);
         } finally {
@@ -564,8 +569,7 @@
         state.energyHistory.length = 0;
         pcmCount = 0;
         pcmPos   = 0;
-        instrumentLabel.dataset.state = '';
-        instrumentLabel.textContent   = '—';
+        setInstrumentStatus('—', '');
         resetCanvas();
         resetMetricBars();
     }

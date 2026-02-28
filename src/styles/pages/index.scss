@@ -104,21 +104,62 @@ h1 {
     display: block;
 }
 
-// Instrument Label
-.instrument-label {
+// Instrument Results Panel
+.instrument-results {
     width: min(100%, 660px);
     background-color: #1a1a30;
-    border-radius: 10px;
-    padding: 10px 20px;
-    font-size: 0.88rem;
-    color: #e0e0e0;
-    text-align: center;
-    letter-spacing: 0.04em;
+    border-radius: 12px;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
 
-    &[data-state="loading"] { color: #888; font-style: italic; }
+.instrument-status {
+    font-size: 0.88rem;
+    color: #888;
+    text-align: center;
+    margin: 0;
+
+    &[data-state="loading"] { font-style: italic; }
     &[data-state="ready"]   { color: #3ddc84; }
-    &[data-state="result"]  { color: #fff; font-weight: 600; }
     &[data-state="error"]   { color: #e94560; font-style: italic; }
+}
+
+.instr-row {
+    display: grid;
+    grid-template-columns: 120px 1fr 46px;
+    align-items: center;
+    gap: 8px;
+}
+
+.instr-label {
+    font-size: 0.76rem;
+    color: #ccc;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.instr-track {
+    height: 6px;
+    background-color: #2a2a4a;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.instr-bar {
+    height: 100%;
+    background-color: #e94560;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.instr-value {
+    font-size: 0.72rem;
+    font-family: monospace;
+    color: #bbb;
+    text-align: right;
 }
 
 // Metrics Panel
