@@ -2,7 +2,8 @@ import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
 
 export default defineSchema({
-    tracks: defineTable({
+    music: defineTable({
+        id: v.string(),
         title: v.optional(v.string()),
         prompt: v.optional(v.string()),
         artist: v.optional(v.string()),
@@ -15,6 +16,6 @@ export default defineSchema({
         source: v.optional(v.string()),
         mimeType: v.optional(v.string()),
         uploadedAt: v.number(),
-    }).index('by_artist', ['artist']),
+    }).index('by_id', ['id']),
 
 });
