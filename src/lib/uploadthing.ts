@@ -4,19 +4,19 @@ const utapi = new UTApi();
 
 // uploadFile
 export async function uploadFile(file: File) {
-    const { fileKey } = await utapi.uploadFile(file);
+    const [ fileKey ] = await utapi.uploadFiles([file]);
     return fileKey;
 }
 
 // uploadFileByUrl
 export async function uploadFileByUrl(url: string) {
-    const { fileKey } = await utapi.uploadFileByUrl(url);
+    const [ fileKey ] = await utapi.uploadFilesFromUrl([url]);
     return fileKey;
 }
 
 // getFile
 export async function getFile(fileKey: string) {
-    return await utapi.getFile(fileKey);
+    return await utapi.getFiles(fileKey);
 }
 
 // getFileUrl
@@ -26,7 +26,7 @@ export async function getFileUrl(fileKey: string) {
 
 // deleteFile
 export async function deleteFile(fileKey: string) {
-    return await utapi.deleteFile(fileKey);
+    return await utapi.deleteFiles([fileKey]);
 }
 
 // listFiles
