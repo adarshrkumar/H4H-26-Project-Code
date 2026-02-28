@@ -14,7 +14,7 @@ export async function uploadFileByUrl(url: string) {
     return fileKey;
 }
 
-// getFileUrl
+// getFi eUrl
 export function getFileUrl(fileKey: string) {
     return `https://utfs.io/f/${fileKey}`;
 }
