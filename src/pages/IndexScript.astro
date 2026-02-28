@@ -104,4 +104,55 @@
 
         return { energy, brightness, tempo, flux, spread, flatness, bassRatio, zcr };
     }
+
+    function getMood(energy: number, brightness: number, tempo: number, flux: number, spread: number, flatness: number, bassRatio: number, zcr: number): string {
+        if (energy < minThreashold) return 'silent';
+
+        let mood: string;
+        if (energy < 0.35) {
+            mood = brightness < 0.38 ? 'melancholic' : brightness < 0.65 ? 'peaceful' : 'serene';
+        } else if (energy < 0.60) {
+            mood = brightness < 0.38 ? 'tense' : brightness < 0.65 ? 'focused' : 'uplifting';
+        } else {
+            mood = brightness < 0.38 ? 'angry' : brightness < 0.65 ? 'powerful' : 'excited';
+        }
+
+        if (energy > 0.80) {
+            const loudMap: Record<string, string> = { peaceful: 'uplifting', serene: 'excited', focused: 'powerful', uplifting: 'excited', melancholic: 'tense', tranquil: 'peaceful', meditative: 'serene', hopeful: 'uplifting', somber: 'melancholic', contemplative: 'focused', brooding: 'tense', heavy: 'powerful', giddy: 'excited' };
+            mood = loudMap[mood] ?? mood;
+        } else if (energy < 0.22) {
+            const quietMap: Record<string, string> = { angry: 'tense', powerful: 'focused', excited: 'uplifting', furious: 'angry', intense: 'powerful', frantic: 'tense', driven: 'focused', restless: 'melancholic', joyful: 'peaceful', playful: 'peaceful', euphoric: 'serene' };
+            mood = quietMap[mood] ?? mood;
+        }
+
+        if (tempo > 0.65) {
+            const fastMap: Record<string, string> = { melancholic: 'restless', peaceful: 'playful', serene: 'joyful', tense: 'frantic', focused: 'driven', uplifting: 'euphoric', angry: 'furious', powerful: 'intense', excited: 'euphoric' };
+            mood = fastMap[mood] ?? mood;
+        } else if (tempo > 0 && tempo < 0.25) {
+            const slowMap: Record<string, string> = { melancholic: 'somber', peaceful: 'tranquil', serene: 'meditative', tense: 'brooding', focused: 'contemplative', uplifting: 'hopeful', angry: 'smoldering', powerful: 'heavy', excited: 'giddy' };
+            mood = slowMap[mood] ?? mood;
+        }
+
+        if (flux < 0.05 && energy > 0.12) {
+            const droneMap: Record<string, string> = { melancholic: 'somber', peaceful: 'meditative', serene: 'meditative', tense: 'brooding', focused: 'contemplative', uplifting: 'hopeful', angry: 'smoldering', powerful: 'heavy', excited: 'giddy', restless: 'brooding', frantic: 'tense', driven: 'focused', euphoric: 'serene', furious: 'angry', intense: 'powerful' };
+            mood = droneMap[mood] ?? mood;
+        }
+
+        if (spread > 0.55 && energy > 0.40) {
+            const wideMap: Record<string, string> = { focused: 'powerful', tense: 'frantic', uplifting: 'excited', peaceful: 'uplifting', melancholic: 'tense', contemplative: 'focused', tranquil: 'peaceful' };
+            mood = wideMap[mood] ?? mood;
+        }
+
+        if (bassRatio > 0.30 && energy > 0.25) {
+            const bassMap: Record<string, string> = { uplifting: 'focused', excited: 'powerful', joyful: 'driven', playful: 'restless', hopeful: 'contemplative', giddy: 'restless', euphoric: 'intense', serene: 'peaceful', tranquil: 'somber' };
+            mood = bassMap[mood] ?? mood;
+        }
+
+        if (flatness > 0.70 && zcr > 0.15 && energy > 0.15) {
+            const noisyMap: Record<string, string> = { peaceful: 'restless', serene: 'uplifting', tranquil: 'peaceful', meditative: 'contemplative', somber: 'brooding', hopeful: 'focused', contemplative: 'tense' };
+            mood = noisyMap[mood] ?? mood;
+        }
+
+        return mood;
+    }
 </script>
