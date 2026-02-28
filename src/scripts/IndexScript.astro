@@ -334,28 +334,42 @@
     function metricsToColor(f: Features): { l: number; c: number; h: number } {
         if (f.energy < MIN_THRESHOLD) return { l: 93, c: 0, h: 0 };
 
-        // Hue: pitch-based when tonal, brightness-based when atonal/noisy
-        // dominantPitch 0–1 spans C→B across the full hue circle
-        // brightness 0–1 spans warm→cool (0°→280°) as a fallback
-        const pitchHue      = f.dominantPitch * 360;
-        const brightnessHue = f.brightness * 280;
-        const h = (pitchHue * f.chromaStrength + brightnessHue * (1 - f.chromaStrength)) % 360;
+        // ── Hue ──────────────────────────────────────────────────────────
+        // brightness (log spectral centroid) for typical music sits ~0.3–0.65.
+        // Map to the full circle but offset +210° so mid-range lands on
+        // orange/red rather than green (which sits at ~120°).
+        const spectralHue = (f.brightness * 360 + 210) % 360;
 
-        // Chroma (saturation): harmonic, high-contrast audio is vivid; noise is grey
-        // Roughness and flatness desaturate
-        const c = Math.min(0.37,
-            (f.harmonicRatio * 0.20 + f.chromaStrength * 0.12 + f.spectralContrast * 0.10)
-            * (1 - f.flatness * 0.4)
-            * (1 - f.roughness * 0.3)
-        );
+        // When the audio is clearly tonal, blend toward the dominant pitch class.
+        // Amplify chromaStrength (usually small) so it actually takes effect.
+        const chromaWeight = Math.min(1, f.chromaStrength * 4);
+        const pitchHue     = f.dominantPitch * 360;
 
-        // Lightness: perceptual loudness (RMS) as the primary driver
-        // Sub-bass darkens slightly; high frequencies brighten slightly
-        const l = Math.min(85, Math.max(10,
-            15 + f.rms * 65
-            - f.subBass * 8
-            + f.highRatio * 6
+        // Secondary shifts for inter-song variation
+        const tempoShift = f.tempo   * 40;  // fast tempo → +40° warmer
+        const bassShift  = f.subBass * 30;  // sub-bass   → −30° cooler
+
+        const h = (
+            spectralHue * (1 - chromaWeight) + pitchHue * chromaWeight
+            + tempoShift - bassShift
+            + 360
+        ) % 360;
+
+        // ── Chroma ────────────────────────────────────────────────────────
+        // Always at least 0.08 when audio is playing so the canvas is never grey.
+        // Harmonic, high-contrast content saturates; noise/roughness desaturate.
+        const c = Math.max(0.08, Math.min(0.35,
+            0.10
+            + f.harmonicRatio    * 0.15
+            + f.chromaStrength   * 0.08
+            + f.spectralContrast * 0.07
+            - f.flatness         * 0.05
+            - f.roughness        * 0.04
         ));
+
+        // ── Lightness ─────────────────────────────────────────────────────
+        // Floor at 38% so it's never "dark nothing"; energy lifts it toward 80%.
+        const l = Math.min(82, Math.max(38, 40 + f.energy * 100));
 
         return { l, c, h };
     }
