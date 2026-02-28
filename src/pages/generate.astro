@@ -21,7 +21,7 @@ import GenerateScript from '../scripts/GenerateScript.astro';
                 ></textarea>
             </div>
 
-            <div class="field field--inline">
+            <div class="field field-inline">
                 <label for="duration">Duration (seconds)</label>
                 <input
                     type="number"
@@ -34,7 +34,7 @@ import GenerateScript from '../scripts/GenerateScript.astro';
                 <span class="hint">Leave blank to let ElevenLabs decide</span>
             </div>
 
-            <button type="submit" id="generate-btn" class="btn btn--primary">Generate</button>
+            <button type="submit" id="generate-btn" class="btn">Generate</button>
         </form>
 
         <!-- Error banner -->
@@ -43,7 +43,7 @@ import GenerateScript from '../scripts/GenerateScript.astro';
             <div id="suggestion-box" class="suggestion-box" hidden>
                 <p class="suggestion-box__label">Suggested alternative:</p>
                 <p id="suggestion-text" class="suggestion-box__text"></p>
-                <button id="use-suggestion-btn" class="btn btn--secondary btn--small">Use this suggestion</button>
+                <button id="use-suggestion-btn" class="btn secondary small">Use this suggestion</button>
             </div>
         </div>
 
