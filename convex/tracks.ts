@@ -37,7 +37,8 @@ export const getTrack = query({
 
 export const createTrack = mutation({
     args: {
-        title: v.string(),
+        title: v.optional(v.string()),
+        prompt: v.optional(v.string()),
         artist: v.optional(v.string()),
         album: v.optional(v.string()),
         duration: v.optional(v.number()),
@@ -45,7 +46,7 @@ export const createTrack = mutation({
         uploadThingKey: v.optional(v.string()),
         uploadThingUrl: v.optional(v.string()),
         source: v.optional(v.string()),
-        mimeType: v.string(),
+        mimeType: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
         const id = await ctx.db.insert('tracks', {
@@ -60,6 +61,7 @@ export const updateTrack = mutation({
     args: {
         id: v.id('tracks'),
         title: v.optional(v.string()),
+        prompt: v.optional(v.string()),
         artist: v.optional(v.string()),
         album: v.optional(v.string()),
         duration: v.optional(v.number()),
