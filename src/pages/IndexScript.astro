@@ -303,4 +303,108 @@
         resetCanvas();
         resetMetricBars();
     }
+
+    document.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            const mode = (tab as HTMLElement).dataset.mode;
+            if (tab.classList.contains('active')) return;
+            stopCapture();
+            document.querySelectorAll('.tab').forEach(t =>
+                t.classList.toggle('active', t === tab));
+            document.querySelectorAll('.ctrl-panel').forEach(p =>
+                p.classList.toggle('active', p.id === `ctrl-${mode}`));
+            audioFileInput.value = '';
+        });
+    });
+
+    audioFileInput.addEventListener('change', async (event) => {
+        const file = (event.target as HTMLInputElement).files?.[0];
+        if (!file) return;
+        stopCapture();
+        try {
+            await ensureAudioContext();
+            setupAnalyser();
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const audioBuffer = await audioContext!.decodeAudioData(e.target!.result as ArrayBuffer);
+                    bufferSource = audioContext!.createBufferSource();
+                    bufferSource.buffer = audioBuffer;
+                    bufferSource.connect(analyser!);
+                    analyser!.connect(audioContext!.destination);
+                    bufferSource.start(0);
+                    bufferSource.onended = () => {
+                        if (bufferSource) { bufferSource.disconnect(); bufferSource = null; }
+                    };
+                    if (!animationFrameId) drawVisualization();
+                } catch (err) {
+                    console.error('Audio decode error:', err);
+                    alert('Could not decode this audio file. Try MP3, WAV, or OGG.');
+                }
+            };
+            reader.onerror = () => alert('Could not read the selected file.');
+            reader.readAsArrayBuffer(file);
+        } catch (err) {
+            console.error('Audio setup error:', err);
+        }
+    });
+
+    speakerStartBtn.addEventListener('click', async () => {
+        stopCapture();
+        try {
+            mediaStream = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true });
+            const audioTracks = mediaStream.getAudioTracks();
+            if (audioTracks.length === 0) {
+                alert('No audio track found. Make sure to check "Share audio" in the browser prompt.');
+                mediaStream.getTracks().forEach(t => t.stop());
+                mediaStream = null;
+                return;
+            }
+            mediaStream.getVideoTracks().forEach(t => t.stop());
+            await ensureAudioContext();
+            setupAnalyser();
+            sourceNode = audioContext!.createMediaStreamSource(mediaStream);
+            sourceNode.connect(analyser!);
+            audioTracks[0].onended = stopCapture;
+            speakerStartBtn.disabled = true;
+            speakerStopBtn.disabled  = false;
+            if (!animationFrameId) drawVisualization();
+        } catch (err: any) {
+            if (err.name !== 'NotAllowedError') {
+                console.error('Speaker capture error:', err);
+                alert('Could not start audio capture.');
+            }
+        }
+    });
+
+    speakerStopBtn.addEventListener('click', stopCapture);
+
+    micStartBtn.addEventListener('click', async () => {
+        stopCapture();
+        try {
+            mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            await ensureAudioContext();
+            setupAnalyser();
+            sourceNode = audioContext!.createMediaStreamSource(mediaStream);
+            silentGain = audioContext!.createGain();
+            silentGain.gain.value = 0;
+            sourceNode.connect(analyser!);
+            analyser!.connect(silentGain);
+            silentGain.connect(audioContext!.destination);
+            audioContext!.onstatechange = () => {
+                if (audioContext && audioContext.state === 'suspended') audioContext.resume();
+            };
+            mediaStream.getAudioTracks()[0].onended = stopCapture;
+            micStartBtn.disabled = true;
+            micStopBtn.disabled  = false;
+            if (!animationFrameId) drawVisualization();
+        } catch (err: any) {
+            if (err.name !== 'NotAllowedError') {
+                console.error('Microphone error:', err);
+                alert('Could not access the microphone.');
+            }
+        }
+    });
+
+    micStopBtn.addEventListener('click', stopCapture);
 </script>
