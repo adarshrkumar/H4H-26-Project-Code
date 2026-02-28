@@ -39,12 +39,12 @@ h1 {
     transition: background-color 0.15s, color 0.15s;
 }
 
-.tab:hover:not(.active) {
+.tab:hover:not([data-state="active"]) {
     background-color: #252545;
     color: #ccc;
 }
 
-.tab.active {
+.tab[data-state="active"] {
     background-color: #e94560;
     color: #fff;
     font-weight: 600;
@@ -61,7 +61,7 @@ h1 {
 }
 
 .ctrl-panel { display: none; gap: 10px; align-items: center; }
-.ctrl-panel.active { display: flex; }
+.ctrl-panel[data-state="active"] { display: flex; }
 
 .ctrl-panel label {
     font-size: 0.88rem;
