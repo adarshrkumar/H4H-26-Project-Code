@@ -19,3 +19,5 @@ export async function generateMusic(prompt: string): Promise<Buffer> {
     }
     return Buffer.concat(chunks);
 }
+
+// import { generateMusic } from './eleven-labs';
