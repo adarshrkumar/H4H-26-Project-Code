@@ -2,26 +2,28 @@ import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
 
 export default defineSchema({
-    posts: defineTable({
+    tracks: defineTable({
         title: v.string(),
-        slug: v.string(),
-        content: v.string(),
-        excerpt: v.optional(v.string()),
-        authorId: v.string(),
-        authorName: v.optional(v.string()),
-        published: v.boolean(),
-        featured: v.boolean(),
-        metaTitle: v.optional(v.string()),
-        metaDescription: v.optional(v.string()),
-        publishedAt: v.optional(v.number()),
-    }).index('by_slug', ['slug']),
+        artist: v.optional(v.string()),
+        album: v.optional(v.string()),
+        duration: v.optional(v.number()),
+        storageId: v.optional(v.string()),
+        mimeType: v.string(),
+        uploadedAt: v.number(),
+    }).index('by_artist', ['artist']),
 
-    comments: defineTable({
-        postId: v.id('posts'),
-        content: v.string(),
-        authorId: v.string(),
-        authorName: v.optional(v.string()),
-        approved: v.boolean(),
-        flagged: v.boolean(),
-    }).index('by_post', ['postId']),
+    analyses: defineTable({
+        trackId: v.id('tracks'),
+        mood: v.string(),
+        color: v.string(),
+        energy: v.number(),
+        brightness: v.number(),
+        tempo: v.number(),
+        flux: v.number(),
+        spread: v.number(),
+        flatness: v.number(),
+        bassRatio: v.number(),
+        zcr: v.number(),
+        analyzedAt: v.number(),
+    }).index('by_track', ['trackId']),
 });

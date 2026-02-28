@@ -29,9 +29,9 @@ npm run ts <file.ts>            # node --experimental-strip-types
 
 **Rendering**: Server-side (`output: 'server'`) via `@astrojs/vercel` adapter.
 
-**Database**: Convex (real-time sync). Schema is in `convex/schema.ts`. The HTTP client is initialized in `src/db/initialize.ts`. `drizzle.config.ts` is deprecated and can be ignored.
+**Database**: Convex (real-time sync). Schema is in `convex/schema.ts` with `tracks` and `analyses` tables. Convex functions live in `convex/tracks.ts` and `convex/analyses.ts`. The HTTP client is initialized in `src/db/initialize.ts`. `drizzle.config.ts` is deprecated and can be ignored.
 
-**AI**: Vercel AI SDK (`ai`) in `src/pages/api/chat.ts` with streaming responses. Defaults to `openai/gpt-4o` but supports any provider via the model parameter. Exa search integration lives in `src/lib/exa-search.ts`.
+**AI**: Exa search integration lives in `src/lib/exa-search.ts`.
 
 **Key path aliases** (from `tsconfig.json`):
 

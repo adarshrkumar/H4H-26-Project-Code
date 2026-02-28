@@ -1,6 +1,6 @@
 import type { Doc, Id } from '../../convex/_generated/dataModel';
 
-export type Post = Doc<'posts'>;
-export type PostId = Id<'posts'>;
-export type Comment = Doc<'comments'>;
-export type CommentId = Id<'comments'>;
+export type Track = Doc<'tracks'>;
+export type TrackId = Id<'tracks'>;
+export type Analysis = Doc<'analyses'>;
+export type AnalysisId = Id<'analyses'>;
