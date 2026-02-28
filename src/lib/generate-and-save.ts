@@ -72,7 +72,23 @@ function parseResult(value: unknown): GenerateAndSaveResult {
         throw new Error('Missing track upload time in response');
     }
 
-    return value;
+    const file = isRecord(value.file) ? {
+        key: typeof value.file.key === 'string' ? value.file.key : '',
+        url: typeof value.file.url === 'string' ? value.file.url : undefined,
+    } : undefined;
+
+    return {
+        id: value.id,
+        creationTime: value.creationTime,
+        title: value.title,
+        artist: typeof value.artist === 'string' ? value.artist : undefined,
+        duration: typeof value.duration === 'number' ? value.duration : undefined,
+        storageId: typeof value.storageId === 'string' ? value.storageId : undefined,
+        file,
+        source: typeof value.source === 'string' ? value.source : undefined,
+        mimeType: typeof value.mimeType === 'string' ? value.mimeType : undefined,
+        uploadedAt: value.uploadedAt,
+    };
 }
 
 export async function generateAndSave(
