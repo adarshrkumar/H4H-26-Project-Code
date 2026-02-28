@@ -8,10 +8,9 @@ export default defineSchema({
         artist: v.optional(v.string()),
         album: v.optional(v.string()),
         duration: v.optional(v.number()),
-        file: v.optional(v.object({
-            key: v.string(),
-            url: v.string(),
-        })),
+        storageId: v.optional(v.id('_storage')),
+        uploadThingKey: v.optional(v.string()),
+        uploadThingUrl: v.optional(v.string()),
         source: v.optional(v.string()),
         mimeType: v.optional(v.string()),
         uploadedAt: v.number(),

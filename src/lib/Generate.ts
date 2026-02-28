@@ -19,7 +19,7 @@ export interface SavedTrack {
     uploadThingKey?: string;
     uploadThingUrl?: string;
     source?: string;
-    mimeType: string;
+    mimeType?: string;
     uploadedAt: number;
 }
 
@@ -86,9 +86,6 @@ function parseResult(value: unknown): GenerateAndSaveResult {
     if (typeof track._creationTime !== 'number') {
         throw new Error('Missing track creation time in response');
     }
-    if (typeof track.mimeType !== 'string' || track.mimeType.length === 0) {
-        throw new Error('Missing track MIME type in response');
-    }
     if (typeof track.uploadedAt !== 'number') {
         throw new Error('Missing track upload time in response');
     }
@@ -111,7 +108,7 @@ export async function generateAndSave(
         throw new GenerateAndSaveError('Text is required', 400);
     }
 
-    const response = await fetch('/api/tts/generate', {
+    const response = await fetch('/api/generate', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

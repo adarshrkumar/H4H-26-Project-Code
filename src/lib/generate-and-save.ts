@@ -1,5 +1,5 @@
-import { createRecording } from '@/db/helpers';
-import { uploadAudioBuffer } from '@/lib/uploadthing';
+import { createRecording, updateRecording } from '@/db/helpers';
+import { getFileUrl, uploadFile } from '@/lib/uploadthing';
 
 const DEFAULT_VOICE_ID = 'JBFqnCBsd6RMkjVDRZzb';
 const DEFAULT_MODEL_ID = 'eleven_multilingual_v2';
@@ -23,6 +23,57 @@ export interface GenerateAndSaveOutput {
         key: string;
         url?: string;
     };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null;
+}
+
+function getTrackId(value: unknown): string {
+    if (!isRecord(value) || typeof value._id !== 'string' || value._id.length === 0) {
+        throw new Error('Failed to create recording row');
+    }
+    return value._id;
+}
+
+function normalizeUpload(uploadResult: unknown): { key: string; url?: string } {
+    if (typeof uploadResult === 'string' && uploadResult.length > 0) {
+        return {
+            key: uploadResult,
+            url: getFileUrl(uploadResult),
+        };
+    }
+
+    if (!isRecord(uploadResult)) {
+        throw new Error('UploadThing upload failed');
+    }
+
+    if (typeof uploadResult.key === 'string' && uploadResult.key.length > 0) {
+        return {
+            key: uploadResult.key,
+            url:
+                typeof uploadResult.ufsUrl === 'string'
+                    ? uploadResult.ufsUrl
+                    : typeof uploadResult.url === 'string'
+                        ? uploadResult.url
+                        : getFileUrl(uploadResult.key),
+        };
+    }
+
+    const data = isRecord(uploadResult.data) ? uploadResult.data : null;
+    if (data && typeof data.key === 'string' && data.key.length > 0) {
+        return {
+            key: data.key,
+            url:
+                typeof data.ufsUrl === 'string'
+                    ? data.ufsUrl
+                    : typeof data.url === 'string'
+                        ? data.url
+                        : getFileUrl(data.key),
+        };
+    }
+
+    throw new Error('UploadThing upload failed');
 }
 
 function sanitizeInput(input: GenerateAndSaveInput): GenerateAndSaveInput {
@@ -135,14 +186,14 @@ export async function generateAndSave(input: GenerateAndSaveInput): Promise<Gene
         outputFormat,
     });
 
-    const uploadThing = await uploadAudioBuffer(audioBuffer, fileName, mimeType);
+    const file = new File([audioBuffer], fileName, { type: mimeType });
+    const uploaded = await uploadFile(file);
+    const uploadThing = normalizeUpload(uploaded);
 
-    const track = await createRecording({
+    const created = await createRecording(payload.text);
+    const trackId = getTrackId(created) as Parameters<typeof updateRecording>[0];
+    const track = await updateRecording(trackId, {
         title,
-        artist: payload.artist ?? 'ElevenLabs',
-        album: payload.album,
-        mimeType,
-        source: 'elevenlabs',
         fileKey: uploadThing.key,
         fileUrl: uploadThing.url,
     });

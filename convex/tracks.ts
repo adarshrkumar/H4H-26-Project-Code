@@ -69,6 +69,7 @@ export const updateTrack = mutation({
         uploadThingKey: v.optional(v.string()),
         uploadThingUrl: v.optional(v.string()),
         source: v.optional(v.string()),
+        mimeType: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
         const { id, ...updates } = args;

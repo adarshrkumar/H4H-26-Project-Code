@@ -1,7 +1,8 @@
 import { z } from 'zod';
 
 export const createTrackSchema = z.object({
-    title: z.string().min(1, 'Title is required').max(255).trim(),
+    title: z.string().min(1).max(255).trim().optional().nullable(),
+    prompt: z.string().min(1).max(5000).trim().optional().nullable(),
     artist: z.string().max(255).optional().nullable(),
     album: z.string().max(255).optional().nullable(),
     duration: z.number().positive().optional().nullable(),
@@ -9,7 +10,7 @@ export const createTrackSchema = z.object({
     uploadThingKey: z.string().optional().nullable(),
     uploadThingUrl: z.string().url().optional().nullable(),
     source: z.string().max(255).optional().nullable(),
-    mimeType: z.string().min(1, 'MIME type is required'),
+    mimeType: z.string().min(1).optional().nullable(),
 });
 
 export const updateTrackSchema = createTrackSchema.partial().extend({
