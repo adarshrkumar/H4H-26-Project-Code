@@ -1,230 +1,132 @@
-import 'dotenv/config';
-import { Music } from '@elevenlabs/elevenlabs-js';
-import type { MusicPrompt, SongSection } from '@elevenlabs/elevenlabs-js';
-
-// Lazy client — initialized on first use so the API key is read at request time,
-// not at module-load time when import.meta.env may not be populated yet.
-let _music: Music | null = null;
-function getMusic(): Music {
-    if (!_music) {
-        const apiKey =
-            (import.meta as unknown as { env: Record<string, string> }).env?.ELEVENLABS_API_KEY ??
-            process.env.ELEVENLABS_API_KEY;
-        _music = new Music({ apiKey });
-    }
-    return _music;
+export interface GenerateAndSavePayload {
+    text: string;
+    title?: string;
+    artist?: string;
+    album?: string;
+    voiceId?: string;
+    modelId?: string;
+    outputFormat?: string;
 }
 
-// mp3_44100_128 = 44.1kHz, 128kbps — good quality, broad browser support
-const OUTPUT_FORMAT = 'mp3_44100_128' as const;
+export interface SavedTrack {
+    _id: string;
+    _creationTime: number;
+    title: string;
+    artist?: string;
+    album?: string;
+    duration?: number;
+    storageId?: string;
+    uploadThingKey?: string;
+    uploadThingUrl?: string;
+    source?: string;
+    mimeType?: string;
+    uploadedAt: number;
+}
 
-// --- Error types -----------------------------------------------------------
+export interface GenerateAndSaveResult {
+    track: SavedTrack;
+    uploadThing: {
+        key: string;
+        url?: string;
+    };
+}
 
-/**
- * Thrown when the prompt contains a banned artist name or copyrighted lyrics.
- * The `suggestion` field contains an ElevenLabs-provided clean alternative.
- */
-export class CopyrightPromptError extends Error {
-    readonly suggestion: string | null;
-    constructor(message: string, suggestion: string | null) {
+export class GenerateAndSaveError extends Error {
+    status: number;
+    details?: unknown;
+
+    constructor(message: string, status: number, details?: unknown) {
         super(message);
-        this.name = 'CopyrightPromptError';
-        this.suggestion = suggestion;
+        this.name = 'GenerateAndSaveError';
+        this.status = status;
+        this.details = details;
     }
 }
 
-/**
- * Thrown when a section's style descriptors contain copyrighted material.
- * The `sectionName` identifies which section failed.
- * The `suggestedPlan` is the ElevenLabs-corrected composition plan.
- */
-export class CopyrightPlanError extends Error {
-    readonly sectionName: string;
-    readonly suggestedPlan: MusicPrompt | null;
-    constructor(message: string, sectionName: string, suggestedPlan: MusicPrompt | null) {
-        super(message);
-        this.name = 'CopyrightPlanError';
-        this.sectionName = sectionName;
-        this.suggestedPlan = suggestedPlan;
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null;
+}
+
+function asOptionalString(value: unknown): string | undefined {
+    return typeof value === 'string' && value.trim() !== '' ? value : undefined;
+}
+
+function normalizePayload(input: GenerateAndSavePayload): GenerateAndSavePayload {
+    return {
+        text: input.text.trim(),
+        title: asOptionalString(input.title),
+        artist: asOptionalString(input.artist),
+        album: asOptionalString(input.album),
+        voiceId: asOptionalString(input.voiceId),
+        modelId: asOptionalString(input.modelId),
+        outputFormat: asOptionalString(input.outputFormat),
+    };
+}
+
+function parseResult(value: unknown): GenerateAndSaveResult {
+    if (!isRecord(value)) {
+        throw new Error('Invalid response from generate endpoint');
     }
-}
 
-// --- Helpers ---------------------------------------------------------------
+    const { track, uploadThing } = value;
+    if (!isRecord(track) || !isRecord(uploadThing)) {
+        throw new Error('Missing track or upload data in response');
+    }
 
-/**
- * Duck-types an unknown error as an ElevenLabs API error.
- * Avoids instanceof which breaks under Vite's CJS/ESM interop.
- */
-function isElevenLabsError(err: unknown): err is { statusCode: number; body: Record<string, unknown> } {
-    return (
-        err !== null &&
-        typeof err === 'object' &&
-        'statusCode' in err &&
-        'body' in err &&
-        typeof (err as Record<string, unknown>).body === 'object'
-    );
-}
+    if (typeof uploadThing.key !== 'string' || uploadThing.key.length === 0) {
+        throw new Error('Missing upload key in response');
+    }
 
-function parseErrorBody(err: { body: Record<string, unknown> }): {
-    code: string | null;
-    promptSuggestion: string | null;
-    planSuggestion: MusicPrompt | null;
-} {
-    const body = err.body;
+    if (typeof track.title !== 'string' || track.title.length === 0) {
+        throw new Error('Missing track title in response');
+    }
+    if (typeof track._id !== 'string' || track._id.length === 0) {
+        throw new Error('Missing track id in response');
+    }
+    if (typeof track._creationTime !== 'number') {
+        throw new Error('Missing track creation time in response');
+    }
+    if (typeof track.uploadedAt !== 'number') {
+        throw new Error('Missing track upload time in response');
+    }
+
     return {
-        code: (body?.error as string) ?? null,
-        promptSuggestion: (body?.prompt_suggestion as string) ?? null,
-        planSuggestion: (body?.composition_plan_suggestion as MusicPrompt) ?? null,
+        track: track as unknown as SavedTrack,
+        uploadThing: {
+            key: uploadThing.key,
+            url: typeof uploadThing.url === 'string' ? uploadThing.url : undefined,
+        },
     };
 }
 
-/**
- * Wraps a single SongSection in a full MusicPrompt for individual composition.
- */
-function sectionToPlan(section: SongSection, globalPlan: MusicPrompt): MusicPrompt {
-    return {
-        positiveGlobalStyles: globalPlan.positiveGlobalStyles,
-        negativeGlobalStyles: globalPlan.negativeGlobalStyles,
-        sections: [section],
-    };
-}
-
-// --- Types -----------------------------------------------------------------
-
-export type GeneratedSection = {
-    sectionName: string;
-    durationMs: number;
-    positiveLocalStyles: string[];
-    /** Suggested filename from ElevenLabs (e.g. "intro-cool-track.mp3") */
-    filename: string;
-    /** Song title/genres returned by ElevenLabs for this section */
-    metadata: {
-        title: string;
-        description: string;
-        genres: string[];
-        languages: string[];
-    };
-    /** Raw audio buffer — convert to File on the server, or base64 for transport */
-    audioBuffer: Buffer;
-};
-
-export type GenerationResult = {
-    prompt: string;
-    compositionPlan: MusicPrompt;
-    sections: GeneratedSection[];
-    generatedAt: number;
-};
-
-// --- Main export -----------------------------------------------------------
-
-/**
- * Generates a full song split into individually playable section files.
- *
- * Steps:
- * 1. Create a composition plan from the prompt (free — no credits used).
- * 2. For each section in the plan, call composeDetailed() — returns audio Buffer + metadata.
- * 3. Optionally auto-save each section via the onSave callback.
- *
- * Constraints (from ElevenLabs API):
- * - musicLengthMs: 3,000ms – 600,000ms
- * - Section durationMs: 3,000ms – 120,000ms
- * - Output format: mp3_44100_128 (44.1kHz, 128kbps)
- *
- * @throws {CopyrightPromptError} If the prompt contains a banned artist name or lyrics.
- * @throws {CopyrightPlanError} If a section's styles contain copyrighted material.
- *
- * @param prompt - Natural language description of the song to generate.
- * @param musicLengthMs - Optional total song length in ms. ElevenLabs chooses if omitted.
- * @param onSave - Optional callback called with each section's File as it finishes.
- */
 export async function generateAndSave(
-    prompt: string,
-    musicLengthMs?: number,
-    onSave?: (file: File, section: GeneratedSection, index: number) => Promise<void>
-): Promise<GenerationResult> {
-    // Step 1: Build composition plan (no credits deducted)
-    let compositionPlan: MusicPrompt;
-    try {
-        compositionPlan = await getMusic().compositionPlan.create({
-            prompt,
-            ...(musicLengthMs !== undefined && { musicLengthMs }),
-        });
-    } catch (err) {
-        if (isElevenLabsError(err)) {
-            const { code, promptSuggestion } = parseErrorBody(err);
-            if (code === 'bad_prompt') {
-                throw new CopyrightPromptError(
-                    `Prompt contains copyrighted material. ${promptSuggestion ? 'A suggestion is available.' : 'No suggestion provided (harmful content).'}`,
-                    promptSuggestion
-                );
-            }
-        }
-        throw err;
+    input: GenerateAndSavePayload,
+    options?: { signal?: AbortSignal }
+): Promise<GenerateAndSaveResult> {
+    const payload = normalizePayload(input);
+    if (!payload.text) {
+        throw new GenerateAndSaveError('Text is required', 400);
     }
 
-    // Step 2: Generate each section individually in parallel
-    const sections = await Promise.all(
-        compositionPlan.sections.map(async (section: SongSection, index: number) => {
-            const singleSectionPlan = sectionToPlan(section, compositionPlan);
+    const response = await fetch('/api/generate', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+        },
+        body: JSON.stringify(payload),
+        signal: options?.signal,
+    });
 
-            let audio: Buffer;
-            let filename: string;
-            let json: { songMetadata: { title?: string; description?: string; genres: string[]; languages: string[] } };
+    const body = await response.json().catch(() => null);
 
-            try {
-                ({ audio, filename, json } = await getMusic().composeDetailed({
-                    compositionPlan: singleSectionPlan,
-                    outputFormat: OUTPUT_FORMAT,
-                }));
-            } catch (err) {
-                if (isElevenLabsError(err)) {
-                    const { code, planSuggestion } = parseErrorBody(err);
-                    if (code === 'bad_composition_plan') {
-                        throw new CopyrightPlanError(
-                            `Section "${section.sectionName}" contains copyrighted style descriptors. ${planSuggestion ? 'A corrected plan is available.' : 'No suggestion provided (harmful content).'}`,
-                            section.sectionName,
-                            planSuggestion
-                        );
-                    }
-                }
-                throw err;
-            }
+    if (!response.ok) {
+        const message =
+            isRecord(body) && typeof body.error === 'string'
+                ? body.error
+                : 'Failed to generate and save audio';
+        throw new GenerateAndSaveError(message, response.status, body);
+    }
 
-            const generatedSection: GeneratedSection = {
-                sectionName: section.sectionName,
-                durationMs: section.durationMs,
-                positiveLocalStyles: section.positiveLocalStyles,
-                filename,
-                metadata: {
-                    title: json.songMetadata.title ?? section.sectionName,
-                    description: json.songMetadata.description ?? '',
-                    genres: json.songMetadata.genres,
-                    languages: json.songMetadata.languages,
-                },
-                audioBuffer: audio,
-            };
-
-            if (onSave) {
-                const file = new File([new Uint8Array(audio)], filename, { type: 'audio/mpeg' });
-                await onSave(file, generatedSection, index);
-            }
-
-            return generatedSection;
-        })
-    );
-
-    return {
-        prompt,
-        compositionPlan,
-        sections,
-        generatedAt: Date.now(),
-    };
-}
-
-/**
- * Converts a GeneratedSection's audioBuffer into a File object.
- * Use this in API routes before returning data to the browser.
- */
-export function sectionToFile(section: GeneratedSection): File {
-    return new File([new Uint8Array(section.audioBuffer)], section.filename, { type: 'audio/mpeg' });
+    return parseResult(body);
 }
