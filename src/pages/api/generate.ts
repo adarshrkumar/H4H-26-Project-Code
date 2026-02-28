@@ -156,20 +156,19 @@ export const POST: APIRoute = async ({ request }) => {
         const uploadData = getUploadData(uploadResponse);
 
         const convex = new ConvexHttpClient(convexUrl);
-        const createTrack = makeFunctionReference<'mutation'>('tracks:createTrack');
-        const track = await convex.mutation(createTrack, {
+        const createMusic = makeFunctionReference<'mutation'>('music:createMusic');
+        const music = await convex.mutation(createMusic, {
             title: payload.title ?? shortTitleFromText(payload.text),
             artist: payload.artist ?? 'ElevenLabs',
             album: payload.album,
             mimeType: 'audio/mpeg',
-            uploadThingKey: uploadData.key,
-            uploadThingUrl: uploadData.url,
+            file: { key: uploadData.key, url: uploadData.url ?? '' },
             source: 'elevenlabs',
         });
 
         return Response.json(
             {
-                track,
+                music,
                 uploadThing: uploadData,
             },
             { status: 201 }

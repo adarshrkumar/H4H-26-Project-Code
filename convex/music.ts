@@ -16,58 +16,61 @@ export const getFileUrl = query({
     },
 });
 
-export const listTracks = query({
+export const listMusic = query({
     args: {
         artist: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
-        const all = await ctx.db.query('tracks').collect();
+        const all = await ctx.db.query('music').collect();
         return args.artist
             ? all.filter((t) => t.artist === args.artist)
             : all;
     },
 });
 
-export const getTrack = query({
-    args: { id: v.id('tracks') },
+export const getMusic = query({
+    args: { id: v.id('music') },
     handler: async (ctx, args) => {
         return await ctx.db.get(args.id);
     },
 });
 
-export const createTrack = mutation({
+export const createMusic = mutation({
     args: {
+        id: v.string(),
         title: v.optional(v.string()),
         prompt: v.optional(v.string()),
         artist: v.optional(v.string()),
         album: v.optional(v.string()),
         duration: v.optional(v.number()),
-        storageId: v.optional(v.id('_storage')),
-        uploadThingKey: v.optional(v.string()),
-        uploadThingUrl: v.optional(v.string()),
+        file: v.optional(v.object({
+            key: v.string(),
+            url: v.string(),
+        })),
         source: v.optional(v.string()),
         mimeType: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
-        const id = await ctx.db.insert('tracks', {
+        const docId = await ctx.db.insert('music', {
             ...args,
             uploadedAt: Date.now(),
         });
-        return await ctx.db.get(id);
+        return await ctx.db.get(docId);
     },
 });
 
-export const updateTrack = mutation({
+export const updateMusic = mutation({
     args: {
-        id: v.id('tracks'),
+        id: v.id('music'),
         title: v.optional(v.string()),
         prompt: v.optional(v.string()),
         artist: v.optional(v.string()),
         album: v.optional(v.string()),
         duration: v.optional(v.number()),
-        storageId: v.optional(v.id('_storage')),
-        uploadThingKey: v.optional(v.string()),
-        uploadThingUrl: v.optional(v.string()),
+        file: v.optional(v.object({
+            key: v.string(),
+            url: v.string(),
+        })),
         source: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
@@ -79,8 +82,8 @@ export const updateTrack = mutation({
     },
 });
 
-export const deleteTrack = mutation({
-    args: { id: v.id('tracks') },
+export const deleteMusic = mutation({
+    args: { id: v.id('music') },
     handler: async (ctx, args) => {
         const existing = await ctx.db.get(args.id);
         if (!existing) return null;

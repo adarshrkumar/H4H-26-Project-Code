@@ -3,21 +3,22 @@ import { api } from '../../convex/_generated/api';
 import type { Id } from '../../convex/_generated/dataModel';
 
 export async function createRecording(prompt: string) {
-    return await convex.mutation(api.tracks.createTrack, { prompt });
+    return await convex.mutation(api.music.createMusic, { prompt });
 }
 
 export async function updateRecording(
-    id: Id<'tracks'>,
+    id: Id<'music'>,
     fields: {
         title?: string;
         fileKey?: string;
         fileUrl?: string;
     }
 ) {
-    return await convex.mutation(api.tracks.updateTrack, {
+    return await convex.mutation(api.music.updateMusic, {
         id,
         title: fields.title,
-        uploadThingKey: fields.fileKey,
-        uploadThingUrl: fields.fileUrl,
+        file: fields.fileKey && fields.fileUrl
+            ? { key: fields.fileKey, url: fields.fileUrl }
+            : undefined,
     });
 }
