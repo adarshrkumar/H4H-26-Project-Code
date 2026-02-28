@@ -3,15 +3,15 @@
 
 <script>
     const _state = {
-        prevEnergy:    0,
         prevSpectrum:  null as Uint8Array | null,
         onsetTimes:    [] as number[],
         energyHistory: [] as number[],
+        energyEMA:     0,
         sampleRate:    44100,
     };
 
     const MIN_THRESHOLD  = 0.01;
-    const NUM_HISTORY    = 50;
+    const NUM_HISTORY    = 200;
     const ENERGY_HISTORY = 10;
 
     function getAudioFeatures(dataArray: Uint8Array, timeDomainArray?: Uint8Array) {
@@ -57,11 +57,19 @@
         _state.prevSpectrum = new Uint8Array(dataArray);
 
         // ── onset / tempo ────────────────────────────────────────────────────
-        const now   = performance.now();
-        const delta = energy - _state.prevEnergy;
-        if (delta > 0.12 && energy > 0.15) _state.onsetTimes.push(now);
-        _state.prevEnergy = energy;
-        const cutoff = now - 3000;
+        // Track a slow EMA of energy as a local "baseline".
+        // An onset fires when energy jumps 35% above that baseline,
+        // with a 250 ms minimum gap to prevent double-counting.
+        const now = performance.now();
+        _state.energyEMA = _state.energyEMA * 0.88 + energy * 0.12;
+        if (
+            energy > _state.energyEMA * 1.35 &&
+            energy > 0.04 &&
+            (_state.onsetTimes.length === 0 || now - _state.onsetTimes[_state.onsetTimes.length - 1] > 250)
+        ) {
+            _state.onsetTimes.push(now);
+        }
+        const cutoff = now - 6000;
         while (_state.onsetTimes.length > 0 && _state.onsetTimes[0] < cutoff)
             _state.onsetTimes.shift();
         let tempo = 0;
@@ -74,17 +82,16 @@
         }
 
         // ── flatness ─────────────────────────────────────────────────────────
+        // Use log(x+1) over ALL bins so geo and arith means share the same
+        // denominator (N-1), preventing the ratio from exceeding 1.
         let flatness = 0;
         if (totalAmplitude > 0) {
-            let logSum = 0, nonZero = 0;
-            for (let i = 1; i < N; i++) {
-                if (dataArray[i] > 0) { logSum += Math.log(dataArray[i]); nonZero++; }
-            }
-            if (nonZero > 0) {
-                const geoMean   = Math.exp(logSum / nonZero);
-                const arithMean = totalAmplitude / N;
-                flatness = Math.min(1, arithMean > 0 ? geoMean / arithMean : 0);
-            }
+            const n = N - 1;
+            let logSum = 0;
+            for (let i = 1; i < N; i++) logSum += Math.log(dataArray[i] + 1);
+            const geoMean   = Math.exp(logSum / n);
+            const arithMean = (totalAmplitude + n) / n;
+            flatness = Math.min(1, geoMean / arithMean);
         }
 
         // ── bassRatio (bottom 10% of bins) ───────────────────────────────────
@@ -124,8 +131,8 @@
         const subBassEnd = hz2bin(80);
         let subBassSum = 0;
         for (let i = 1; i <= subBassEnd; i++) subBassSum += dataArray[i];
-        const subBass = totalAmplitude > 0
-            ? Math.min(1, (subBassSum / subBassEnd) / (totalAmplitude / N)) : 0;
+        // Fraction of total energy in the sub-bass band — stays in [0, 1].
+        const subBass = totalAmplitude > 0 ? Math.min(1, subBassSum / totalAmplitude) : 0;
 
         // ── midRatio (250 Hz – 4 kHz) ────────────────────────────────────────
         const midStart = hz2bin(250), midEnd = hz2bin(4000);
@@ -303,7 +310,8 @@
             let raw = 0;
             for (let i = 0; i < numFilters; i++)
                 raw += melFilters[i] * Math.cos(Math.PI * (i + 0.5) / numFilters);
-            mfcc1 = Math.min(1, Math.max(0, (raw + 10) / 20));
+            // raw sums 13 mel log-energy values weighted by DCT cosines → range ~[-50, +50]
+            mfcc1 = Math.min(1, Math.max(0, (raw + 50) / 100));
         }
 
         // ── tonnetz (fifth-related tonal coherence from chroma) ───────────────
