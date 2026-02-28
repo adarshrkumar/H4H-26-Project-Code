@@ -7,13 +7,13 @@ import IndexScript from './IndexScript.astro';
 <Layout pageTitle="Audio to Color">
     <h1>Audio to Color</h1>
 
-    <div id="mode-tabs">
+    <div id="mode-tabs" class="mode-tabs">
         <button class="tab" data-state="active" data-mode="file">File</button>
         <button class="tab" data-mode="speaker">Speaker / Tab</button>
         <button class="tab" data-mode="microphone">Microphone</button>
     </div>
 
-    <div id="controls">
+    <div id="controls" class="controls">
         <div id="ctrl-file" class="ctrl-panel" data-state="active">
             <label for="audioFile">Audio file</label>
             <input type="file" id="audioFile" accept="audio/*" />
@@ -28,11 +28,11 @@ import IndexScript from './IndexScript.astro';
         </div>
     </div>
 
-    <canvas id="colorCanvas" width="660" height="280"></canvas>
+    <canvas id="colorCanvas" class="color-canvas" width="660" height="280"></canvas>
 
-    <p id="mood"></p>
+    <p id="mood" class="mood"></p>
 
-    <div id="metrics"></div>
+    <div id="metrics" class="metrics"></div>
 
     <IndexScript />
 </Layout>
