@@ -6,12 +6,10 @@ const client = new ElevenLabsClient({ apiKey: (import.meta as unknown as { env: 
 
 export async function generateMusic(prompt: string): Promise<Buffer> {
 
-    // Get raw response with headers
-    const { data } = await client.textToSpeech.convert('voice_id', {
+    const data = await client.textToSpeech.convert('voice_id', {
         text: prompt,
         modelId: 'eleven_multilingual_v2',
-    })
-    .withRawResponse();
+    });
 
     const chunks: Uint8Array[] = [];
     const reader = data.getReader();
