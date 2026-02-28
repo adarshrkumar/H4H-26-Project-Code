@@ -41,7 +41,6 @@ export const createMusic = mutation({
         title: v.optional(v.string()),
         prompt: v.optional(v.string()),
         artist: v.optional(v.string()),
-        album: v.optional(v.string()),
         duration: v.optional(v.number()),
         file: v.optional(v.object({
             key: v.string(),
@@ -65,7 +64,6 @@ export const updateMusic = mutation({
         title: v.optional(v.string()),
         prompt: v.optional(v.string()),
         artist: v.optional(v.string()),
-        album: v.optional(v.string()),
         duration: v.optional(v.number()),
         file: v.optional(v.object({
             key: v.string(),

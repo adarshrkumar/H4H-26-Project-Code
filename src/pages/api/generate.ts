@@ -40,19 +40,12 @@ export const POST: APIRoute = async ({ request }) => {
             text: payload.text,
             title: payload.title,
             artist: payload.artist,
-            album: payload.album,
             voiceId: payload.voiceId,
             modelId: payload.modelId,
             outputFormat: payload.outputFormat,
         });
 
-        return Response.json(
-            {
-                track: result.track,
-                uploadThing: result.uploadThing,
-            },
-            { status: 201 }
-        );
+        return Response.json( result, { status: 201 } );
     } catch (error) {
         console.error('[api/generate] failed', error);
 
