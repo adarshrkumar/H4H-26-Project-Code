@@ -13,10 +13,6 @@ export async function generateMusic(prompt: string): Promise<Buffer> {
     })
     .withRawResponse();
 
-    // Access character cost from headers
-    const charCost = rawResponse.headers.get('x-character-count');
-    const requestId = rawResponse.headers.get('request-id');
-
     const chunks: Uint8Array[] = [];
     const reader = data.getReader();
     while (true) {
