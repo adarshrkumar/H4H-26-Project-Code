@@ -442,57 +442,117 @@
 
     type Features = ReturnType<typeof getAudioFeatures>;
 
-    let lastLCH = { l: 70, c: 0.15, h: 200 };
-    let lastHueVec = { x: Math.cos(200 * Math.PI / 180), y: Math.sin(200 * Math.PI / 180) };
+    // ── A. Layered frequency-color bars ──────────────────────────────────────
+    type LayerBand  = { e: number; l: number; c: number; h: number };
+    type LayerFrame = { bass: LayerBand; mid: LayerBand; high: LayerBand };
+    const smBand = {
+        bass: { l: 15, c: 0.20, h: 265 },
+        mid:  { l: 15, c: 0.20, h: 120 },
+        high: { l: 15, c: 0.20, h: 10  },
+    };
 
-    function metricsToColor(f: Features): { l: number; c: number; h: number } {
-        const smoothing = 0.08; // Lower = smoother transitions
+    // ── C. Beat rings ─────────────────────────────────────────────────────────
+    type Ring = { x: number; y: number; r: number; maxR: number; h: number };
+    const rings: Ring[] = [];
 
-        if (f.energy < MIN_THRESHOLD) {
-            // Keep previous color but slowly dim it
-            lastLCH.l = Math.max(15, lastLCH.l * 0.98);
-            return { ...lastLCH };
+    // ── D. Particles ──────────────────────────────────────────────────────────
+    type Particle = { x: number; y: number; vx: number; vy: number; age: number; life: number; h: number; sz: number };
+    const ptcls: Particle[] = [];
+
+    // ── E. Screen shake ───────────────────────────────────────────────────────
+    let shakeAmt = 0;
+
+    // ── Mood system ───────────────────────────────────────────────────────────
+    const moodW = { calm: 0.5, energetic: 0, sad: 0, angry: 0, dreamy: 0.5 };
+
+    // Mood → [bassHue, midHue, highHue]
+    const MOOD_HUE: Record<keyof typeof moodW, [number, number, number]> = {
+        calm:      [250, 180, 200], // slow blue gradients
+        energetic: [280,  60,  15], // neon purple, yellow, red
+        sad:       [260, 250, 270], // all dark blue/purple
+        angry:     [ 20,  30,   5], // red/orange
+        dreamy:    [300, 195, 320], // pastel purple/cyan/pink
+    };
+
+    function updateMood(f: Features) {
+        const sm = 0.03;
+        const lerp = (a: number, b: number) => a * (1 - sm) + b * sm;
+        moodW.calm      = lerp(moodW.calm,      (1-f.energy)*0.4 + f.harmonicRatio*0.3 + (1-f.tempo)*0.3);
+        moodW.energetic = lerp(moodW.energetic, f.energy*0.5 + f.tempo*0.5);
+        moodW.sad       = lerp(moodW.sad,       (1-f.energy)*0.3 + f.subBass*0.4 + f.flatness*0.3);
+        moodW.angry     = lerp(moodW.angry,     f.energy*0.3 + f.roughness*0.4 + f.spectralContrast*0.3);
+        moodW.dreamy    = lerp(moodW.dreamy,    f.harmonicRatio*0.3 + f.chromaStrength*0.3 + (1-Math.abs(f.energy-0.4))*0.4);
+    }
+
+    function dominantMood(): keyof typeof moodW {
+        let best: keyof typeof moodW = 'calm';
+        let bestV = -1;
+        for (const k of Object.keys(moodW) as (keyof typeof moodW)[]) {
+            if (moodW[k] > bestV) { bestV = moodW[k]; best = k; }
+        }
+        return best;
+    }
+
+    function computeLayers(f: Features): LayerFrame {
+        const sm   = 0.08;
+        const lerp = (a: number, b: number) => a * (1 - sm) + b * sm;
+        const [bH0, mH0, hH0] = MOOD_HUE[dominantMood()];
+
+        const bassE = Math.max(f.subBass * 0.6 + f.bassRatio * 0.4, 0.001);
+        const midE  = f.midRatio;
+        const highE = f.highRatio;
+
+        smBand.bass.l = lerp(smBand.bass.l, 10 + bassE * 60);
+        smBand.bass.c = lerp(smBand.bass.c, 0.12 + bassE * 0.24);
+        smBand.bass.h = lerp(smBand.bass.h, bH0 + f.subBass * 30);
+
+        smBand.mid.l  = lerp(smBand.mid.l,  10 + midE * 70);
+        smBand.mid.c  = lerp(smBand.mid.c,  0.12 + midE * 0.24);
+        smBand.mid.h  = lerp(smBand.mid.h,  mH0 + f.brightness * 40);
+
+        smBand.high.l = lerp(smBand.high.l, 10 + highE * 85);
+        smBand.high.c = lerp(smBand.high.c, Math.max(0.04, 0.26 - highE * 0.12));
+        smBand.high.h = lerp(smBand.high.h, hH0 + f.highRatio * 20);
+
+        return {
+            bass: { e: bassE, ...smBand.bass },
+            mid:  { e: midE,  ...smBand.mid  },
+            high: { e: highE, ...smBand.high },
+        };
+    }
+
+    function spawnBeatEffects(f: Features, cx: number, cy: number) {
+        const isOnset = f.attackTime > 0.25 && f.energy > 0.05;
+        if (!isOnset) return;
+
+        // C. Ring
+        rings.push({
+            x: cx, y: cy,
+            r: 8,
+            maxR: (Math.min(cx, cy)) * (0.5 + f.energy * 0.8),
+            h: smBand.bass.h,
+        });
+
+        // D. Particles on stronger beats
+        if (f.energy > 0.12) {
+            const count = Math.round(6 + f.energy * 12);
+            const hues  = [smBand.bass.h, smBand.mid.h, smBand.high.h];
+            for (let i = 0; i < count; i++) {
+                const angle = (Math.PI * 2 * i / count) + Math.random() * 0.4;
+                const speed = 1.5 + f.energy * 4.5 + Math.random() * 2;
+                ptcls.push({
+                    x: cx, y: cy,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    age: 0, life: 40 + Math.random() * 30,
+                    h: hues[i % 3],
+                    sz: 2 + f.energy * 4,
+                });
+            }
         }
 
-        // ── Calculate Target Hue ─────────────────────────────────────────
-        const spectralHue = (f.brightness * 360 + 180) % 360;
-        const tonalHue    = (f.dominantPitch * 360);
-        const structureHue = (f.rolloff * 360 + f.zcr * 720) % 360;
-
-        const chromaWeight = Math.min(1, f.chromaStrength * 5);
-        const noiseWeight  = Math.min(1, f.flatness * 2);
-
-        let targetH = (
-            spectralHue * (1 - chromaWeight) * (1 - noiseWeight) +
-            tonalHue * chromaWeight +
-            structureHue * noiseWeight
-        ) % 360;
-        targetH = (targetH + f.tempo * 60 - f.subBass * 40 + 360) % 360;
-
-        // ── Calculate Target Chroma & Lightness ──────────────────────────
-        const targetC = Math.max(0.12, Math.min(0.38,
-            0.15
-            + f.harmonicRatio    * 0.20
-            + f.chromaStrength   * 0.10
-            + f.spectralContrast * 0.08
-            - f.flatness         * 0.06
-        ));
-        const targetL = Math.min(85, Math.max(25, 35 + f.energy * 120));
-
-        // ── Apply Smoothing ──────────────────────────────────────────────
-        // Smooth L and C directly
-        const l = lastLCH.l * (1 - smoothing) + targetL * smoothing;
-        const c = lastLCH.c * (1 - smoothing) + targetC * smoothing;
-
-        // Smooth Hue using vector components to avoid wrap-around jumps
-        const targetX = Math.cos(targetH * Math.PI / 180);
-        const targetY = Math.sin(targetH * Math.PI / 180);
-        lastHueVec.x = lastHueVec.x * (1 - smoothing) + targetX * smoothing;
-        lastHueVec.y = lastHueVec.y * (1 - smoothing) + targetY * smoothing;
-        const h = (Math.atan2(lastHueVec.y, lastHueVec.x) * 180 / Math.PI + 360) % 360;
-
-        lastLCH = { l, c, h };
-        return lastLCH;
+        // E. Screen shake on strong beat
+        if (f.energy > 0.35) shakeAmt = Math.min(8, f.energy * 12);
     }
 
     import { METRICS } from '@/lib/metrics';
@@ -508,7 +568,7 @@
     canvasCtx.fillStyle = '#0f0f1a';
     canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
 
-    const lchHistory: { l: number; c: number; h: number; energy: number; intensity: number }[] = [];
+    const layerHistory: LayerFrame[] = [];
 
     let audioContext:     AudioContext | null = null;
     let analyser:         AnalyserNode | null = null;
@@ -579,8 +639,10 @@
         micStartBtn.disabled     = false;
         micStopBtn.disabled      = true;
 
-        state.pulseProgress = 0;
-        lchHistory.length = 0;
+        layerHistory.length = 0;
+        rings.length        = 0;
+        ptcls.length        = 0;
+        shakeAmt            = 0;
         state.energyHistory.length = 0;
         pcmCount = 0;
         pcmPos   = 0;
@@ -715,61 +777,93 @@
             runClassification();
         }
 
-        const features    = getAudioFeatures(dataArray!, timeDomainArray!);
-        const { l, c, h } = metricsToColor(features);
+        const features = getAudioFeatures(dataArray!, timeDomainArray!);
+        updateMood(features);
 
-        if (features.isBeat) {
-            state.pulseProgress = 1.0;
-            state.pulseLCH = { l, c, h };
-        } else {
-            state.pulseProgress *= 0.96; // Slower decay (was 0.92)
-        }
+        const cx = canvas.width  / 2;
+        const cy = canvas.height / 2;
+        spawnBeatEffects(features, cx, cy);
 
-        lchHistory.push({ l, c, h, energy: features.energy, intensity: features.intensity });
-        if (lchHistory.length > NUM_HISTORY) lchHistory.shift();
+        const frame = computeLayers(features);
+        layerHistory.push(frame);
+        if (layerHistory.length > NUM_HISTORY) layerHistory.shift();
 
+        // ── Screen shake ──────────────────────────────────────────────────────
+        shakeAmt *= 0.82;
+        const dx = shakeAmt > 0.5 ? (Math.random() - 0.5) * shakeAmt * 2 : 0;
+        const dy = shakeAmt > 0.5 ? (Math.random() - 0.5) * shakeAmt     : 0;
+        canvasCtx.save();
+        canvasCtx.translate(dx, dy);
+
+        // ── Background ────────────────────────────────────────────────────────
         canvasCtx.fillStyle = '#0f0f1a';
-        canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+        canvasCtx.fillRect(-12, -12, canvas.width + 24, canvas.height + 24);
 
-        // Draw Pulse Aura (behind waveform, but on canvas)
-        if (state.pulseProgress > 0.01) {
-            canvasCtx.save();
-            const p = state.pulseProgress;
-            // Vertical scale expansion for pulse - more pronounced
-            const pulseHeight = canvas.height * 0.25 * (1 + p * 5);
-            const pulseGradient = canvasCtx.createLinearGradient(0, (canvas.height - pulseHeight)/2, 0, (canvas.height + pulseHeight)/2);
-            pulseGradient.addColorStop(0, `oklch(${state.pulseLCH.l}% ${state.pulseLCH.c} ${state.pulseLCH.h} / 0)`);
-            // Higher opacity for more noticeability (0.6 instead of 0.4)
-            pulseGradient.addColorStop(0.5, `oklch(${state.pulseLCH.l}% ${state.pulseLCH.c} ${state.pulseLCH.h} / ${p * 0.6})`);
-            pulseGradient.addColorStop(1, `oklch(${state.pulseLCH.l}% ${state.pulseLCH.c} ${state.pulseLCH.h} / 0)`);
-            
-            canvasCtx.fillStyle = pulseGradient;
-            canvasCtx.fillRect(0, (canvas.height - pulseHeight)/2, canvas.width, pulseHeight);
-            canvasCtx.restore();
-        }
-
-        const n = lchHistory.length;
+        const n        = layerHistory.length;
         const barWidth = canvas.width / NUM_HISTORY;
 
-        for (let i = 0; i < n; i++) {
-            const item = lchHistory[i];
-            
-            // x: newest (index n-1) is at the right.
-            const x = canvas.width - (n - i) * barWidth;
-            
-            // Fade out towards left: remain opaque for most of width, fade in first 15%
-            const alpha = Math.min(1, i / (NUM_HISTORY * 0.15));
-            
-            // Size: height based on energy, dynamic spikiness via intensity
-            // Exponent decreases as intensity grows, making it pop (spiker/taller)
-            const exponent = SPIKE_BASE_EXP + (item.intensity * SPIKE_INTENSITY_MOD);
-            const barHeight = Math.max(1.5, Math.pow(item.energy, exponent) * canvas.height * SPIKE_SCALE);
-            const y = (canvas.height - barHeight) / 2;
-
-            canvasCtx.fillStyle = `oklch(${item.l}% ${item.c} ${item.h} / ${alpha})`;
-            canvasCtx.fillRect(x, y, barWidth + 1, barHeight);
+        // ── A. Frequency layers (bass → mid → high, back to front) ────────────
+        for (const [band, heightScale, opacityMax] of [
+            ['bass', 1.2, 0.88],
+            ['mid',  1.0, 0.80],
+            ['high', 0.7, 0.70],
+        ] as [keyof LayerFrame, number, number][]) {
+            for (let i = 0; i < n; i++) {
+                const fr    = layerHistory[i][band];
+                const x     = canvas.width - (n - i) * barWidth;
+                const alpha = Math.min(1, i / (NUM_HISTORY * 0.15)) * opacityMax;
+                const bh    = Math.max(2, Math.pow(fr.e, 0.7) * canvas.height * heightScale);
+                canvasCtx.fillStyle = `oklch(${fr.l}% ${fr.c} ${fr.h} / ${alpha})`;
+                canvasCtx.fillRect(x, (canvas.height - bh) / 2, barWidth + 1, bh);
+            }
+        }
         }
 
+        // ── B. Waveform ───────────────────────────────────────────────────────
+        if (timeDomainArray && features.energy > MIN_THRESHOLD) {
+            canvasCtx.strokeStyle = `oklch(72% 0.14 ${smBand.mid.h} / 0.55)`;
+            canvasCtx.lineWidth   = 1.5;
+            canvasCtx.beginPath();
+            const step = canvas.width / timeDomainArray.length;
+            for (let i = 0; i < timeDomainArray.length; i++) {
+                const v = (timeDomainArray[i] / 128) - 1;
+                const y = cy + v * cy * 0.75;
+                i === 0 ? canvasCtx.moveTo(0, y) : canvasCtx.lineTo(i * step, y);
+            }
+            canvasCtx.stroke();
+        }
+
+        // ── C. Beat rings ─────────────────────────────────────────────────────
+        for (let i = rings.length - 1; i >= 0; i--) {
+            const ring = rings[i];
+            const t    = ring.r / ring.maxR;
+            ring.r    += (ring.maxR - ring.r) * 0.07 + 1.2;
+            const alpha = (1 - t) * 0.72;
+            if (alpha < 0.01 || ring.r >= ring.maxR) { rings.splice(i, 1); continue; }
+            canvasCtx.beginPath();
+            canvasCtx.arc(ring.x, ring.y, ring.r, 0, Math.PI * 2);
+            canvasCtx.strokeStyle = `oklch(68% 0.26 ${ring.h} / ${alpha})`;
+            canvasCtx.lineWidth   = 3 * (1 - t) + 0.5;
+            canvasCtx.stroke();
+        }
+
+        // ── D. Particles ──────────────────────────────────────────────────────
+        for (let i = ptcls.length - 1; i >= 0; i--) {
+            const p = ptcls[i];
+            p.x  += p.vx; p.y  += p.vy;
+            p.vy += 0.06;              // gravity
+            p.vx *= 0.97; p.vy *= 0.97; // drag
+            p.age++;
+            if (p.age >= p.life) { ptcls.splice(i, 1); continue; }
+            const t     = p.age / p.life;
+            const alpha = (1 - t) * 0.9;
+            canvasCtx.beginPath();
+            canvasCtx.arc(p.x, p.y, p.sz * (1 - t * 0.7), 0, Math.PI * 2);
+            canvasCtx.fillStyle = `oklch(75% 0.28 ${p.h} / ${alpha})`;
+            canvasCtx.fill();
+        }
+
+        canvasCtx.restore();
         updateMetricBars(features);
     }
 
