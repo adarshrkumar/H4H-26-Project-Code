@@ -20,7 +20,7 @@ h1 {
 }
 
 // Mode Tabs
-#mode-tabs {
+.mode-tabs {
     display: flex;
     gap: 6px;
     background-color: #1a1a30;
@@ -51,7 +51,7 @@ h1 {
 }
 
 // Controls Area
-#controls {
+.controls {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -95,7 +95,7 @@ h1 {
 .btn.stop:hover:not(:disabled) { background-color: #444; }
 
 // Canvas
-#colorCanvas {
+.color-canvas {
     width: min(100%, 660px);
     height: 280px;
     border-radius: 12px;
@@ -105,7 +105,7 @@ h1 {
 }
 
 // Mood Label
-#mood {
+.mood {
     font-size: 1.35rem;
     font-weight: 600;
     letter-spacing: 0.1em;
@@ -117,7 +117,7 @@ h1 {
 }
 
 // Metrics Panel
-#metrics {
+.metrics {
     width: min(100%, 660px);
     background-color: #1a1a30;
     border-radius: 12px;
@@ -128,7 +128,7 @@ h1 {
 }
 
 @media (max-width: 480px) {
-    #metrics { grid-template-columns: 1fr; }
+    .metrics { grid-template-columns: 1fr; }
 }
 
 .metric-row {
@@ -165,11 +165,11 @@ h1 {
     text-align: right;
 }
 
-#bar-energy     { background-color: #ff8c00; }
-#bar-brightness { background-color: #00bfff; }
-#bar-tempo      { background-color: #3ddc84; }
-#bar-flux       { background-color: #b07dff; }
-#bar-spread     { background-color: #20c8b8; }
-#bar-flatness   { background-color: #ff6eb4; }
-#bar-bassRatio  { background-color: #ff4444; }
-#bar-zcr        { background-color: #b8ff2f; }
+.bar-energy     { background-color: #ff8c00; }
+.bar-brightness { background-color: #00bfff; }
+.bar-tempo      { background-color: #3ddc84; }
+.bar-flux       { background-color: #b07dff; }
+.bar-spread     { background-color: #20c8b8; }
+.bar-flatness   { background-color: #ff6eb4; }
+.bar-bassRatio  { background-color: #ff4444; }
+.bar-zcr        { background-color: #b8ff2f; }
