@@ -87,7 +87,7 @@
         classifying = true;
         try {
             const audio  = getRecentPCM();
-            const result = await classifierPipeline({ array: audio, sampling_rate: 16000 });
+            const result = await classifierPipeline(audio);
             const top    = result[0] as { label: string; score: number };
             instrumentLabel.dataset.state = 'result';
             instrumentLabel.textContent   = `${top.label}  ${(top.score * 100).toFixed(0)}%`;
@@ -689,7 +689,6 @@
 
         // ── Instrument classification ─────────────────────────────────────────
         appendPCM(downsampleChunk(timeDomainArray!, state.sampleRate));
-        if (!classifierReady && !classifierLoading) initClassifier();
         const classifyNow = performance.now();
         if (classifierReady && !classifying && pcmCount >= PCM_16K_LEN / 2
                 && classifyNow - lastClassifyTime > CLASSIFY_EVERY_MS) {
@@ -728,4 +727,6 @@
 
         updateMetricBars(features);
     }
+
+    initClassifier();
 </script>
