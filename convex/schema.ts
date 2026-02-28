@@ -8,8 +8,7 @@ export default defineSchema({
         artist: v.optional(v.string()),
         album: v.optional(v.string()),
         duration: v.optional(v.number()),
-        file: v.optional(v.id('file')),
-        uploadThing: v.optional(v.object({
+        file: v.optional(v.object({
             key: v.string(),
             url: v.string(),
         })),
