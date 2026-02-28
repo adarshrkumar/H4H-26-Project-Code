@@ -94,14 +94,24 @@ h1 {
 .btn.stop { background-color: #333; }
 .btn.stop:hover:not(:disabled) { background-color: #444; }
 
+// Canvas container and pulse ring
+.canvas-container {
+    position: relative;
+    width: min(100%, 660px);
+    display: flex;
+    justify-content: center;
+}
+
 // Canvas
 .color-canvas {
-    width: min(100%, 660px);
+    width: 100%;
     height: 340px;
     border-radius: 12px;
     border: 2px solid #252540;
     background-color: #0f0f1a;
     display: block;
+    position: relative;
+    z-index: 2;
 }
 
 // Metrics Panel

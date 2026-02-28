@@ -8,11 +8,19 @@
         energyHistory: []   as number[],
         energyEMA:     0,
         sampleRate:    44100,
+        pulseProgress: 0, // 0 to 1
+        pulseLCH:      { l: 70, c: 0.15, h: 200 }
     };
 
     const MIN_THRESHOLD  = 0.01;
     const NUM_HISTORY    = 200;
     const ENERGY_HISTORY = 10;
+
+    // Waveform spikiness constants
+    const SPIKE_BASE_EXP      = 1.15; // High exponent = smaller quiet sounds (tighter)
+    const SPIKE_INTENSITY_MOD = -0.55; // Negative = lower exponent on loud sounds (spikier/taller)
+    const SPIKE_SCALE         = 1.40; // Vertical scale multiplier
+
 
     function getAudioFeatures(dataArray: Uint8Array, timeDomainArray?: Uint8Array) {
         const N      = dataArray.length;
@@ -58,16 +66,17 @@
 
         // ── onset / tempo ────────────────────────────────────────────────────
         // Track a slow EMA of energy as a local "baseline".
-        // An onset fires when energy jumps 35% above that baseline,
-        // with a 250 ms minimum gap to prevent double-counting.
+        // An onset fires when energy jumps 25% above that baseline (previously 35%)
         const now = performance.now();
         state.energyEMA = state.energyEMA * 0.88 + energy * 0.12;
+        let isBeat = false;
         if (
-            energy > state.energyEMA * 1.35 &&
-            energy > 0.04 &&
-            (state.onsetTimes.length === 0 || now - state.onsetTimes[state.onsetTimes.length - 1] > 250)
+            energy > state.energyEMA * 1.25 &&
+            energy > 0.03 &&
+            (state.onsetTimes.length === 0 || now - state.onsetTimes[state.onsetTimes.length - 1] > 200)
         ) {
             state.onsetTimes.push(now);
+            isBeat = true;
         }
         const cutoff = now - 6000;
         while (state.onsetTimes.length > 0 && state.onsetTimes[0] < cutoff)
@@ -326,6 +335,9 @@
             tonnetz = Math.min(1, Math.sqrt(tCos * tCos + tSin * tSin));
         }
 
+        // Intensity (for spikiness): combination of energy, flux, and rms
+        const intensity = Math.min(1, (energy * 0.5 + flux * 0.3 + rms * 0.2) * 1.5);
+
         return {
             energy, brightness, tempo, flux, spread, flatness, bassRatio, zcr,
             rolloff, subBass, midRatio, highRatio,
@@ -334,6 +346,8 @@
             chromaStrength, dominantPitch,
             pitch, attackTime, beatRegularity,
             roughness, mfcc1, tonnetz,
+            isBeat,
+            intensity,
         };
     }
 
@@ -451,7 +465,7 @@
     canvasCtx.fillStyle = '#0f0f1a';
     canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
 
-    const lchHistory: { l: number; c: number; h: number; energy: number }[] = [];
+    const lchHistory: { l: number; c: number; h: number; energy: number; intensity: number }[] = [];
 
     let audioContext:     AudioContext | null = null;
     let analyser:         AnalyserNode | null = null;
@@ -522,6 +536,7 @@
         micStartBtn.disabled     = false;
         micStopBtn.disabled      = true;
 
+        state.pulseProgress = 0;
         lchHistory.length = 0;
         state.energyHistory.length = 0;
         resetCanvas();
@@ -648,11 +663,35 @@
         const features    = getAudioFeatures(dataArray!, timeDomainArray!);
         const { l, c, h } = metricsToColor(features);
 
-        lchHistory.push({ l, c, h, energy: features.energy });
+        if (features.isBeat) {
+            state.pulseProgress = 1.0;
+            state.pulseLCH = { l, c, h };
+        } else {
+            state.pulseProgress *= 0.96; // Slower decay (was 0.92)
+        }
+
+        lchHistory.push({ l, c, h, energy: features.energy, intensity: features.intensity });
         if (lchHistory.length > NUM_HISTORY) lchHistory.shift();
 
         canvasCtx.fillStyle = '#0f0f1a';
         canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Draw Pulse Aura (behind waveform, but on canvas)
+        if (state.pulseProgress > 0.01) {
+            canvasCtx.save();
+            const p = state.pulseProgress;
+            // Vertical scale expansion for pulse - more pronounced
+            const pulseHeight = canvas.height * 0.25 * (1 + p * 5);
+            const pulseGradient = canvasCtx.createLinearGradient(0, (canvas.height - pulseHeight)/2, 0, (canvas.height + pulseHeight)/2);
+            pulseGradient.addColorStop(0, `oklch(${state.pulseLCH.l}% ${state.pulseLCH.c} ${state.pulseLCH.h} / 0)`);
+            // Higher opacity for more noticeability (0.6 instead of 0.4)
+            pulseGradient.addColorStop(0.5, `oklch(${state.pulseLCH.l}% ${state.pulseLCH.c} ${state.pulseLCH.h} / ${p * 0.6})`);
+            pulseGradient.addColorStop(1, `oklch(${state.pulseLCH.l}% ${state.pulseLCH.c} ${state.pulseLCH.h} / 0)`);
+            
+            canvasCtx.fillStyle = pulseGradient;
+            canvasCtx.fillRect(0, (canvas.height - pulseHeight)/2, canvas.width, pulseHeight);
+            canvasCtx.restore();
+        }
 
         const n = lchHistory.length;
         const barWidth = canvas.width / NUM_HISTORY;
@@ -666,8 +705,10 @@
             // Fade out towards left: remain opaque for most of width, fade in first 15%
             const alpha = Math.min(1, i / (NUM_HISTORY * 0.15));
             
-            // Size: height based on energy, spikier via power function
-            const barHeight = Math.max(2, Math.pow(item.energy, 0.75) * canvas.height * 1.1);
+            // Size: height based on energy, dynamic spikiness via intensity
+            // Exponent decreases as intensity grows, making it pop (spiker/taller)
+            const exponent = SPIKE_BASE_EXP + (item.intensity * SPIKE_INTENSITY_MOD);
+            const barHeight = Math.max(1.5, Math.pow(item.energy, exponent) * canvas.height * SPIKE_SCALE);
             const y = (canvas.height - barHeight) / 2;
 
             canvasCtx.fillStyle = `oklch(${item.l}% ${item.c} ${item.h} / ${alpha})`;
