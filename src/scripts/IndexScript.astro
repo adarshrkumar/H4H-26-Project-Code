@@ -339,47 +339,57 @@
 
     type Features = ReturnType<typeof getAudioFeatures>;
 
+    let lastLCH = { l: 70, c: 0.15, h: 200 };
+    let lastHueVec = { x: Math.cos(200 * Math.PI / 180), y: Math.sin(200 * Math.PI / 180) };
+
     function metricsToColor(f: Features): { l: number; c: number; h: number } {
-        if (f.energy < MIN_THRESHOLD) return { l: 93, c: 0, h: 0 };
+        const smoothing = 0.08; // Lower = smoother transitions
 
-        // ── Hue ──────────────────────────────────────────────────────────
-        // brightness (log spectral centroid) for typical music sits ~0.3–0.65.
-        // Map to the full circle but offset +210° so mid-range lands on
-        // orange/red rather than green (which sits at ~120°).
-        const spectralHue = (f.brightness * 360 + 210) % 360;
+        if (f.energy < MIN_THRESHOLD) {
+            // Keep previous color but slowly dim it
+            lastLCH.l = Math.max(15, lastLCH.l * 0.98);
+            return { ...lastLCH };
+        }
 
-        // When the audio is clearly tonal, blend toward the dominant pitch class.
-        // Amplify chromaStrength (usually small) so it actually takes effect.
-        const chromaWeight = Math.min(1, f.chromaStrength * 4);
-        const pitchHue     = f.dominantPitch * 360;
+        // ── Calculate Target Hue ─────────────────────────────────────────
+        const spectralHue = (f.brightness * 360 + 180) % 360;
+        const tonalHue    = (f.dominantPitch * 360);
+        const structureHue = (f.rolloff * 360 + f.zcr * 720) % 360;
 
-        // Secondary shifts for inter-song variation
-        const tempoShift = f.tempo   * 40;  // fast tempo → +40° warmer
-        const bassShift  = f.subBass * 30;  // sub-bass   → −30° cooler
+        const chromaWeight = Math.min(1, f.chromaStrength * 5);
+        const noiseWeight  = Math.min(1, f.flatness * 2);
 
-        const h = (
-            spectralHue * (1 - chromaWeight) + pitchHue * chromaWeight
-            + tempoShift - bassShift
-            + 360
+        let targetH = (
+            spectralHue * (1 - chromaWeight) * (1 - noiseWeight) +
+            tonalHue * chromaWeight +
+            structureHue * noiseWeight
         ) % 360;
+        targetH = (targetH + f.tempo * 60 - f.subBass * 40 + 360) % 360;
 
-        // ── Chroma ────────────────────────────────────────────────────────
-        // Always at least 0.08 when audio is playing so the canvas is never grey.
-        // Harmonic, high-contrast content saturates; noise/roughness desaturate.
-        const c = Math.max(0.08, Math.min(0.35,
-            0.10
-            + f.harmonicRatio    * 0.15
-            + f.chromaStrength   * 0.08
-            + f.spectralContrast * 0.07
-            - f.flatness         * 0.05
-            - f.roughness        * 0.04
+        // ── Calculate Target Chroma & Lightness ──────────────────────────
+        const targetC = Math.max(0.12, Math.min(0.38,
+            0.15
+            + f.harmonicRatio    * 0.20
+            + f.chromaStrength   * 0.10
+            + f.spectralContrast * 0.08
+            - f.flatness         * 0.06
         ));
+        const targetL = Math.min(85, Math.max(25, 35 + f.energy * 120));
 
-        // ── Lightness ─────────────────────────────────────────────────────
-        // Floor at 38% so it's never "dark nothing"; energy lifts it toward 80%.
-        const l = Math.min(82, Math.max(38, 40 + f.energy * 100));
+        // ── Apply Smoothing ──────────────────────────────────────────────
+        // Smooth L and C directly
+        const l = lastLCH.l * (1 - smoothing) + targetL * smoothing;
+        const c = lastLCH.c * (1 - smoothing) + targetC * smoothing;
 
-        return { l, c, h };
+        // Smooth Hue using vector components to avoid wrap-around jumps
+        const targetX = Math.cos(targetH * Math.PI / 180);
+        const targetY = Math.sin(targetH * Math.PI / 180);
+        lastHueVec.x = lastHueVec.x * (1 - smoothing) + targetX * smoothing;
+        lastHueVec.y = lastHueVec.y * (1 - smoothing) + targetY * smoothing;
+        const h = (Math.atan2(lastHueVec.y, lastHueVec.x) * 180 / Math.PI + 360) % 360;
+
+        lastLCH = { l, c, h };
+        return lastLCH;
     }
 
     const METRICS = [
@@ -438,10 +448,10 @@
     const micStartBtn     = document.getElementById('micStartBtn') as HTMLButtonElement;
     const micStopBtn      = document.getElementById('micStopBtn') as HTMLButtonElement;
 
-    canvasCtx.fillStyle = '#fff';
+    canvasCtx.fillStyle = '#0f0f1a';
     canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
 
-    const lchHistory: { l: number; c: number; h: number }[] = [];
+    const lchHistory: { l: number; c: number; h: number; energy: number }[] = [];
 
     let audioContext:     AudioContext | null = null;
     let analyser:         AnalyserNode | null = null;
@@ -471,7 +481,7 @@
     }
 
     function resetCanvas() {
-        canvasCtx.fillStyle = '#fff';
+        canvasCtx.fillStyle = '#0f0f1a';
         canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
@@ -638,16 +648,31 @@
         const features    = getAudioFeatures(dataArray!, timeDomainArray!);
         const { l, c, h } = metricsToColor(features);
 
-        lchHistory.push({ l, c, h });
+        lchHistory.push({ l, c, h, energy: features.energy });
         if (lchHistory.length > NUM_HISTORY) lchHistory.shift();
 
-        const n    = lchHistory.length;
-        const avgL = lchHistory.reduce((s, v) => s + v.l, 0) / n;
-        const avgC = lchHistory.reduce((s, v) => s + v.c, 0) / n;
-        const avgH = lchHistory.reduce((s, v) => s + v.h, 0) / n;
-
-        canvasCtx.fillStyle = `oklch(${Math.round(avgL)}% ${avgC.toFixed(3)} ${Math.round(avgH)})`;
+        canvasCtx.fillStyle = '#0f0f1a';
         canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+
+        const n = lchHistory.length;
+        const barWidth = canvas.width / NUM_HISTORY;
+
+        for (let i = 0; i < n; i++) {
+            const item = lchHistory[i];
+            
+            // x: newest (index n-1) is at the right.
+            const x = canvas.width - (n - i) * barWidth;
+            
+            // Fade out towards left: remain opaque for most of width, fade in first 15%
+            const alpha = Math.min(1, i / (NUM_HISTORY * 0.15));
+            
+            // Size: height based on energy, spikier via power function
+            const barHeight = Math.max(2, Math.pow(item.energy, 0.75) * canvas.height * 1.1);
+            const y = (canvas.height - barHeight) / 2;
+
+            canvasCtx.fillStyle = `oklch(${item.l}% ${item.c} ${item.h} / ${alpha})`;
+            canvasCtx.fillRect(x, y, barWidth + 1, barHeight);
+        }
 
         updateMetricBars(features);
     }
