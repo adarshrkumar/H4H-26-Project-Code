@@ -239,4 +239,68 @@
     let bufferSource:     AudioBufferSourceNode | null = null;
     let silentGain:       GainNode | null = null;
     let mediaStream:      MediaStream | null = null;
+
+    async function ensureAudioContext() {
+        if (!audioContext || audioContext.state === 'closed') {
+            audioContext = new AudioContext();
+        }
+        if (audioContext.state === 'suspended') {
+            await audioContext.resume();
+        }
+    }
+
+    function setupAnalyser() {
+        analyser = audioContext!.createAnalyser();
+        analyser.fftSize = 2048;
+        dataArray       = new Uint8Array(analyser.frequencyBinCount);
+        timeDomainArray = new Uint8Array(analyser.fftSize);
+    }
+
+    function resetCanvas() {
+        canvasCtx.fillStyle = '#fff';
+        canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function resetMetricBars() {
+        for (const { key } of METRICS) {
+            (document.getElementById(`bar-${key}`) as HTMLElement).style.width = '0%';
+            (document.getElementById(`val-${key}`) as HTMLElement).textContent  = '0.00';
+        }
+    }
+
+    function updateMetricBars(features: Record<string, number>) {
+        for (const { key } of METRICS) {
+            const v   = features[key] ?? 0;
+            const pct = Math.min(100, Math.round(v * 100));
+            (document.getElementById(`bar-${key}`) as HTMLElement).style.width = `${pct}%`;
+            (document.getElementById(`val-${key}`) as HTMLElement).textContent  = v.toFixed(2);
+        }
+    }
+
+    function stopCapture() {
+        if (bufferSource) {
+            try { bufferSource.stop(); } catch (_) {}
+            bufferSource.disconnect();
+            bufferSource = null;
+        }
+        if (sourceNode)  { sourceNode.disconnect();  sourceNode  = null; }
+        if (silentGain)  { silentGain.disconnect();  silentGain  = null; }
+        if (analyser)    { analyser.disconnect();    analyser    = null; }
+        if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+        if (audioContext) audioContext.onstatechange = null;
+        if (animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
+
+        dataArray       = null;
+        timeDomainArray = null;
+
+        speakerStartBtn.disabled = false;
+        speakerStopBtn.disabled  = true;
+        micStartBtn.disabled     = false;
+        micStopBtn.disabled      = true;
+
+        moodDisplay.textContent = '';
+        lchHistory.length = 0;
+        resetCanvas();
+        resetMetricBars();
+    }
 </script>
