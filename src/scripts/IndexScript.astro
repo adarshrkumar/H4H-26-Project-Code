@@ -14,6 +14,91 @@
     const NUM_HISTORY    = 200;
     const ENERGY_HISTORY = 10;
 
+    // ── Instrument Classification ─────────────────────────────────────────────
+    // TODO: replace with your HF repo once you've converted & uploaded the ONNX model
+    const INSTRUMENT_MODEL  = 'YOUR_HF_USERNAME/wav2vec2-instruments-onnx';
+    const CLASSIFY_EVERY_MS = 3000;  // run inference at most every 3 s
+    const PCM_16K_LEN       = 48000; // 3 s at 16 kHz
+
+    const pcm16k             = new Float32Array(PCM_16K_LEN);
+    let   pcmPos             = 0;
+    let   pcmCount           = 0;
+    let   classifierPipeline: any = null;
+    let   classifierReady    = false;
+    let   classifierLoading  = false;
+    let   classifying        = false;
+    let   lastClassifyTime   = 0;
+
+    const instrumentLabel = document.getElementById('instrument-label') as HTMLElement;
+
+    function downsampleChunk(input: Uint8Array, srcSR: number): Float32Array {
+        const ratio  = srcSR / 16000;
+        const outLen = Math.floor(input.length / ratio);
+        const out    = new Float32Array(outLen);
+        for (let i = 0; i < outLen; i++) {
+            const srcIdx = i * ratio;
+            const lo     = Math.floor(srcIdx);
+            const hi     = Math.min(lo + 1, input.length - 1);
+            const frac   = srcIdx - lo;
+            out[i]       = ((input[lo] - 128) / 128) * (1 - frac)
+                         + ((input[hi] - 128) / 128) * frac;
+        }
+        return out;
+    }
+
+    function appendPCM(samples: Float32Array) {
+        for (let i = 0; i < samples.length; i++) {
+            pcm16k[pcmPos] = samples[i];
+            pcmPos = (pcmPos + 1) % PCM_16K_LEN;
+        }
+        pcmCount = Math.min(pcmCount + samples.length, PCM_16K_LEN);
+    }
+
+    function getRecentPCM(): Float32Array {
+        if (pcmCount < PCM_16K_LEN) return pcm16k.slice(0, pcmCount);
+        const out  = new Float32Array(PCM_16K_LEN);
+        const tail = PCM_16K_LEN - pcmPos;
+        out.set(pcm16k.subarray(pcmPos), 0);
+        out.set(pcm16k.subarray(0, pcmPos), tail);
+        return out;
+    }
+
+    async function initClassifier() {
+        if (classifierReady || classifierLoading) return;
+        classifierLoading = true;
+        instrumentLabel.dataset.state = 'loading';
+        instrumentLabel.textContent   = 'Loading instrument model…';
+        try {
+            const { pipeline } = await import('@huggingface/transformers');
+            classifierPipeline = await pipeline('audio-classification', INSTRUMENT_MODEL);
+            classifierReady    = true;
+            instrumentLabel.dataset.state = 'ready';
+            instrumentLabel.textContent   = 'Model ready — listening…';
+        } catch (err) {
+            console.error('Instrument model failed to load:', err);
+            instrumentLabel.dataset.state = 'error';
+            instrumentLabel.textContent   = 'Model unavailable (see console)';
+        } finally {
+            classifierLoading = false;
+        }
+    }
+
+    async function runClassification() {
+        if (classifying || !classifierReady) return;
+        classifying = true;
+        try {
+            const audio  = getRecentPCM();
+            const result = await classifierPipeline({ array: audio, sampling_rate: 16000 });
+            const top    = result[0] as { label: string; score: number };
+            instrumentLabel.dataset.state = 'result';
+            instrumentLabel.textContent   = `${top.label}  ${(top.score * 100).toFixed(0)}%`;
+        } catch (err) {
+            console.error('Classification error:', err);
+        } finally {
+            classifying = false;
+        }
+    }
+
     function getAudioFeatures(dataArray: Uint8Array, timeDomainArray?: Uint8Array) {
         const N      = dataArray.length;
         const sr     = state.sampleRate;
@@ -478,6 +563,10 @@
 
         lchHistory.length = 0;
         state.energyHistory.length = 0;
+        pcmCount = 0;
+        pcmPos   = 0;
+        instrumentLabel.dataset.state = '';
+        instrumentLabel.textContent   = '—';
         resetCanvas();
         resetMetricBars();
     }
@@ -598,6 +687,16 @@
 
         analyser.getByteFrequencyData(dataArray!);
         analyser.getByteTimeDomainData(timeDomainArray!);
+
+        // ── Instrument classification ─────────────────────────────────────────
+        appendPCM(downsampleChunk(timeDomainArray!, state.sampleRate));
+        if (!classifierReady && !classifierLoading) initClassifier();
+        const classifyNow = performance.now();
+        if (classifierReady && !classifying && pcmCount >= PCM_16K_LEN / 2
+                && classifyNow - lastClassifyTime > CLASSIFY_EVERY_MS) {
+            lastClassifyTime = classifyNow;
+            runClassification();
+        }
 
         const features    = getAudioFeatures(dataArray!, timeDomainArray!);
         const { l, c, h } = metricsToColor(features);
