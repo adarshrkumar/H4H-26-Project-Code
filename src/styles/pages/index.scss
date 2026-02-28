@@ -93,3 +93,25 @@ h1 {
 .btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .btn.stop { background-color: #333; }
 .btn.stop:hover:not(:disabled) { background-color: #444; }
+
+/* ── Canvas ── */
+#colorCanvas {
+    width: min(100%, 660px);
+    height: 280px;
+    border-radius: 12px;
+    border: 2px solid #252540;
+    background-color: #fff;
+    display: block;
+}
+
+/* ── Mood label ── */
+#mood {
+    font-size: 1.35rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: capitalize;
+    min-height: 1.6rem;
+    color: #fff;
+    opacity: 0.9;
+    margin-bottom: 0;
+}
