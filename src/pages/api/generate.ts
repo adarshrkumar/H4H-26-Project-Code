@@ -62,8 +62,8 @@ export const POST: APIRoute = async ({ request }) => {
 
         return Response.json({
             error: error instanceof Error
-                ? error.message
-                : 'Failed to generate and save audio',
+                   ? error.message
+                   : 'Failed to generate and save audio',
         }, { status: 500 });
     }
 };
