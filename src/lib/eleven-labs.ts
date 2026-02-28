@@ -1,19 +1,22 @@
-import 'dotenv/config'
+import { Music } from '@elevenlabs/elevenlabs-js';
 
-import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
+const music = new Music({
+    apiKey: import.meta.env.ELEVENLABS_API_KEY,
+});
 
-import config from './config';
-
-const client = new ElevenLabsClient({ apiKey: (import.meta as unknown as { env: Record<string, string> }).env.ELEVENLABS_API_KEY || process.env.ELEVENLABS_API_KEY });
-
-export async function generateMusic(prompt: string): Promise<Buffer> {
-    const data = await client.textToSpeech.convert(config.voice_id, {
-        text: prompt,
-        modelId: config.model_id,
+/**
+ * Generates a single music track from a text prompt.
+ * For per-section generation, use generateAndSave() from generate-and-save.ts instead.
+ */
+export async function generateMusic(prompt: string, musicLengthMs?: number): Promise<Buffer> {
+    const stream = await music.compose({
+        prompt,
+        ...(musicLengthMs !== undefined && { musicLengthMs }),
+        outputFormat: 'mp3_44100_128',
     });
 
+    const reader = stream.getReader();
     const chunks: Uint8Array[] = [];
-    const reader = data.getReader();
     while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -21,5 +24,3 @@ export async function generateMusic(prompt: string): Promise<Buffer> {
     }
     return Buffer.concat(chunks);
 }
-
-// import { generateMusic } from './eleven-labs';
