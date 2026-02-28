@@ -2,10 +2,10 @@
 ---
 
 <script>
-    const _state = {
+    const state = {
         prevSpectrum:  null as Uint8Array | null,
-        onsetTimes:    [] as number[],
-        energyHistory: [] as number[],
+        onsetTimes:    []   as number[],
+        energyHistory: []   as number[],
         energyEMA:     0,
         sampleRate:    44100,
     };
@@ -16,7 +16,7 @@
 
     function getAudioFeatures(dataArray: Uint8Array, timeDomainArray?: Uint8Array) {
         const N      = dataArray.length;
-        const sr     = _state.sampleRate;
+        const sr     = state.sampleRate;
         const fftSz  = N * 2;
         const hz2bin = (hz: number) => Math.max(1, Math.min(N - 1, Math.round(hz * fftSz / sr)));
 
@@ -46,38 +46,38 @@
 
         // ── flux ─────────────────────────────────────────────────────────────
         let flux = 0;
-        if (_state.prevSpectrum && totalAmplitude > 0) {
+        if (state.prevSpectrum && totalAmplitude > 0) {
             let rawFlux = 0;
             for (let i = 0; i < N; i++) {
-                const diff = dataArray[i] - _state.prevSpectrum[i];
+                const diff = dataArray[i] - state.prevSpectrum[i];
                 if (diff > 0) rawFlux += diff;
             }
             flux = rawFlux / totalAmplitude;
         }
-        _state.prevSpectrum = new Uint8Array(dataArray);
+        state.prevSpectrum = new Uint8Array(dataArray);
 
         // ── onset / tempo ────────────────────────────────────────────────────
         // Track a slow EMA of energy as a local "baseline".
         // An onset fires when energy jumps 35% above that baseline,
         // with a 250 ms minimum gap to prevent double-counting.
         const now = performance.now();
-        _state.energyEMA = _state.energyEMA * 0.88 + energy * 0.12;
+        state.energyEMA = state.energyEMA * 0.88 + energy * 0.12;
         if (
-            energy > _state.energyEMA * 1.35 &&
+            energy > state.energyEMA * 1.35 &&
             energy > 0.04 &&
-            (_state.onsetTimes.length === 0 || now - _state.onsetTimes[_state.onsetTimes.length - 1] > 250)
+            (state.onsetTimes.length === 0 || now - state.onsetTimes[state.onsetTimes.length - 1] > 250)
         ) {
-            _state.onsetTimes.push(now);
+            state.onsetTimes.push(now);
         }
         const cutoff = now - 6000;
-        while (_state.onsetTimes.length > 0 && _state.onsetTimes[0] < cutoff)
-            _state.onsetTimes.shift();
+        while (state.onsetTimes.length > 0 && state.onsetTimes[0] < cutoff)
+            state.onsetTimes.shift();
         let tempo = 0;
-        if (_state.onsetTimes.length >= 2) {
+        if (state.onsetTimes.length >= 2) {
             let totalInterval = 0;
-            for (let i = 1; i < _state.onsetTimes.length; i++)
-                totalInterval += _state.onsetTimes[i] - _state.onsetTimes[i - 1];
-            const avgInterval = totalInterval / (_state.onsetTimes.length - 1);
+            for (let i = 1; i < state.onsetTimes.length; i++)
+                totalInterval += state.onsetTimes[i] - state.onsetTimes[i - 1];
+            const avgInterval = totalInterval / (state.onsetTimes.length - 1);
             tempo = Math.min(1, Math.max(0, (60000 / avgInterval - 40) / 140));
         }
 
@@ -257,21 +257,21 @@
         }
 
         // ── attackTime (steepest energy rise over last 10 frames) ────────────
-        _state.energyHistory.push(energy);
-        if (_state.energyHistory.length > ENERGY_HISTORY) _state.energyHistory.shift();
+        state.energyHistory.push(energy);
+        if (state.energyHistory.length > ENERGY_HISTORY) state.energyHistory.shift();
         let maxRise = 0;
-        for (let i = 1; i < _state.energyHistory.length; i++) {
-            const rise = Math.max(0, _state.energyHistory[i] - _state.energyHistory[i - 1]);
+        for (let i = 1; i < state.energyHistory.length; i++) {
+            const rise = Math.max(0, state.energyHistory[i] - state.energyHistory[i - 1]);
             if (rise > maxRise) maxRise = rise;
         }
         const attackTime = Math.min(1, maxRise * 8);
 
         // ── beatRegularity (1 − coefficient of variation of onset intervals) ──
         let beatRegularity = 0;
-        if (_state.onsetTimes.length >= 3) {
+        if (state.onsetTimes.length >= 3) {
             const intervals: number[] = [];
-            for (let i = 1; i < _state.onsetTimes.length; i++)
-                intervals.push(_state.onsetTimes[i] - _state.onsetTimes[i - 1]);
+            for (let i = 1; i < state.onsetTimes.length; i++)
+                intervals.push(state.onsetTimes[i] - state.onsetTimes[i - 1]);
             const mean     = intervals.reduce((s, v) => s + v, 0) / intervals.length;
             const variance = intervals.reduce((s, v) => s + (v - mean) ** 2, 0) / intervals.length;
             const cv       = mean > 0 ? Math.sqrt(variance) / mean : 1;
@@ -466,7 +466,7 @@
     async function ensureAudioContext() {
         if (!audioContext || audioContext.state === 'closed') {
             audioContext = new AudioContext();
-            _state.sampleRate = audioContext.sampleRate;
+            state.sampleRate = audioContext.sampleRate;
         }
         if (audioContext.state === 'suspended') {
             await audioContext.resume();
@@ -523,7 +523,7 @@
         micStopBtn.disabled      = true;
 
         lchHistory.length = 0;
-        _state.energyHistory.length = 0;
+        state.energyHistory.length = 0;
         resetCanvas();
         resetMetricBars();
     }
