@@ -13,9 +13,7 @@ export default defineConfig({
             entrypoint: 'astro/assets/services/noop',
         },
     },
-    integrations: [
-
-    ],
+    integrations: [],
     vite: {
         plugins: [
             VitePWA({
