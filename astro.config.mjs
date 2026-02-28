@@ -64,6 +64,9 @@ export default defineConfig({
                 },
             }),
         ],
+        optimizeDeps: {
+            exclude: ['@huggingface/transformers'],
+        },
         css: {
             preprocessorOptions: {
                 scss: {
