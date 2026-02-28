@@ -1,6 +1,6 @@
-import { UTAPI } from 'uploadthing/server';
+import { UTApi } from 'uploadthing/server';
 
-const utapi = new UTAPI();
+const utapi = new UTApi();
 
 // uploadFile
 export async function uploadFile(file: File) {
