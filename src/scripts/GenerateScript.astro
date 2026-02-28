@@ -2,7 +2,6 @@
     // --- Elements ---
     const form = document.getElementById('generate-form') as HTMLFormElement;
     const promptInput = document.getElementById('prompt') as HTMLTextAreaElement;
-    const durationInput = document.getElementById('duration') as HTMLInputElement;
     const generateBtn = document.getElementById('generate-btn') as HTMLButtonElement;
     const errorBanner = document.getElementById('error-banner') as HTMLDivElement;
     const errorMessage = document.getElementById('error-message') as HTMLParagraphElement;
@@ -15,24 +14,22 @@
     const sectionsGrid = document.getElementById('sections-grid') as HTMLDivElement;
 
     // --- Types matching the API route response ---
-    interface SectionResponse {
-        sectionName: string;
-        durationMs: number;
-        filename: string;
-        genres: string[];
+    interface TrackResponse {
+        _id: string;
         title: string;
-        audioBase64: string;
+        artist?: string;
+        album?: string;
+        uploadThingUrl?: string;
+        duration?: number;
     }
 
     interface GenerateResponse {
-        sections: SectionResponse[];
+        track: TrackResponse;
+        uploadThing: { key: string; url?: string };
     }
 
     interface ErrorResponse {
         error: string;
-        code: 'bad_prompt' | 'bad_composition_plan' | 'unknown';
-        suggestion?: string;
-        sectionName?: string;
     }
 
     // --- Helpers ---
@@ -59,46 +56,25 @@
         suggestionBox.hidden = true;
     }
 
-    function base64ToObjectUrl(base64: string, mimeType = 'audio/mpeg'): string {
-        const binary = atob(base64);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        const blob = new Blob([bytes], { type: mimeType });
-        return URL.createObjectURL(blob);
-    }
-
-    function formatDuration(ms: number): string {
-        const secs = Math.round(ms / 1000);
-        return secs >= 60 ? `${Math.floor(secs / 60)}m ${secs % 60}s` : `${secs}s`;
-    }
-
-    function renderSections(sections: SectionResponse[]) {
+    function renderTrack(track: TrackResponse, audioUrl: string) {
         sectionsGrid.innerHTML = '';
 
-        sections.forEach((section) => {
-            const objectUrl = base64ToObjectUrl(section.audioBase64);
-
-            const card = document.createElement('div');
-            card.className = 'section-card';
-            card.innerHTML = `
-                <div class="section-card__header">
-                    <span class="section-card__name">${section.sectionName}</span>
-                    <span class="section-card__duration">${formatDuration(section.durationMs)}</span>
-                </div>
-                ${section.title ? `<p class="section-card__title">${section.title}</p>` : ''}
-                ${section.genres.length ? `
-                    <div class="section-card__genres">
-                        ${section.genres.map(g => `<span class="genre-tag">${g}</span>`).join('')}
-                    </div>` : ''}
-                <audio class="section-card__audio" controls src="${objectUrl}"></audio>
-                <a class="section-card__download btn secondary small"
-                   href="${objectUrl}"
-                   download="${section.filename}">
-                    Download
-                </a>
-            `;
-            sectionsGrid.appendChild(card);
-        });
+        const card = document.createElement('div');
+        card.className = 'section-card';
+        card.innerHTML = `
+            <div class="section-card__header">
+                <span class="section-card__name">${track.title}</span>
+                ${track.artist ? `<span class="section-card__duration">${track.artist}</span>` : ''}
+            </div>
+            ${track.album ? `<p class="section-card__title">${track.album}</p>` : ''}
+            <audio class="section-card__audio" controls src="${audioUrl}"></audio>
+            <a class="section-card__download btn secondary small"
+               href="${audioUrl}"
+               download="${track.title}">
+                Download
+            </a>
+        `;
+        sectionsGrid.appendChild(card);
 
         sectionsContainer.hidden = false;
     }
@@ -117,41 +93,26 @@
         sectionsContainer.hidden = true;
         sectionsGrid.innerHTML = '';
 
-        const prompt = promptInput.value.trim();
-        const durationSecs = durationInput.value ? Number(durationInput.value) : null;
-        const musicLengthMs = durationSecs ? durationSecs * 1000 : undefined;
+        const text = promptInput.value.trim();
 
-        setLoading(true, 'Creating composition plan…');
+        setLoading(true, 'Generating music…');
 
         try {
-            const res = await fetch('/api/generate-music', {
+            const res = await fetch('/api/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt, musicLengthMs }),
+                body: JSON.stringify({ text }),
             });
-
-            setLoading(true, 'Composing sections…');
 
             if (!res.ok) {
                 const err: ErrorResponse = await res.json();
-                if (err.code === 'bad_prompt') {
-                    showError(
-                        'Your prompt contains a banned artist name or copyrighted lyrics.',
-                        err.suggestion
-                    );
-                } else if (err.code === 'bad_composition_plan') {
-                    showError(
-                        `Section "${err.sectionName}" was flagged for copyrighted content.`,
-                        err.suggestion
-                    );
-                } else {
-                    showError(err.error ?? 'Something went wrong. Please try again.');
-                }
+                showError(err.error ?? 'Something went wrong. Please try again.');
                 return;
             }
 
             const data: GenerateResponse = await res.json();
-            renderSections(data.sections);
+            const audioUrl = data.track.uploadThingUrl ?? data.uploadThing.url ?? '';
+            renderTrack(data.track, audioUrl);
         } catch {
             showError('Network error — could not reach the server.');
         } finally {
