@@ -1,7 +1,7 @@
 {
-    "name": "h4h-project",
+    "name": "audio-to-color",
     "version": "1.0.0",
-    "description": "ATSDC Stack - Astro application",
+    "description": "Real-time audio analysis and mood-driven color visualization",
     "type": "module",
     "scripts": {
         "dev": "astro dev",

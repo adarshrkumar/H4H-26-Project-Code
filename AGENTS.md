@@ -25,7 +25,7 @@ npm run ts <file.ts>            # node --experimental-strip-types
 
 ## Architecture
 
-**Stack (ATSDC)**: Astro 5 + TypeScript + Convex + SCSS + Vercel AI SDK
+**Stack**: Astro 5 + TypeScript + Convex + SCSS
 
 **Rendering**: Server-side (`output: 'server'`) via `@astrojs/vercel` adapter.
 

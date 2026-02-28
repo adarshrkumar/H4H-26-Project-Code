@@ -21,9 +21,9 @@ export default defineConfig({
                 registerType: 'autoUpdate',
                 includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
                 manifest: {
-                    name: 'ATSDC Stack App',
-                    short_name: 'ATSDC',
-                    description: 'Progressive Web App built with the ATSDC Stack',
+                    name: 'Audio to Color',
+                    short_name: 'AudioColor',
+                    description: 'Real-time audio analysis and mood-driven color visualization',
                     theme_color: '#ffffff',
                     background_color: '#ffffff',
                     display: 'standalone',
