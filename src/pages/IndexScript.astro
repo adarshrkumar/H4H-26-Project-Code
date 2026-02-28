@@ -10,4 +10,98 @@
 
     const minThreashold = 0.01;
     const numHistoryItems = 100;
+
+    function getAudioFeatures(dataArray: Uint8Array, timeDomainArray?: Uint8Array) {
+        let sum = 0;
+        let weightedLogSum = 0;
+        let totalAmplitude = 0;
+
+        for (let i = 1; i < dataArray.length; i++) {
+            sum += dataArray[i];
+            weightedLogSum += Math.log2(i) * dataArray[i];
+            totalAmplitude += dataArray[i];
+        }
+
+        const energy = (sum / dataArray.length) / 255;
+        const logCentroid = totalAmplitude > 0 ? weightedLogSum / totalAmplitude : 0;
+        const brightness = logCentroid / Math.log2(dataArray.length);
+
+        let spreadSum = 0;
+        for (let i = 1; i < dataArray.length; i++) {
+            const diff = Math.log2(i) - logCentroid;
+            spreadSum += diff * diff * dataArray[i];
+        }
+        const spread = Math.min(1, totalAmplitude > 0
+            ? Math.sqrt(spreadSum / totalAmplitude) / Math.log2(dataArray.length)
+            : 0);
+
+        let flux = 0;
+        if (_state.prevSpectrum && totalAmplitude > 0) {
+            let rawFlux = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+                const diff = dataArray[i] - _state.prevSpectrum[i];
+                if (diff > 0) rawFlux += diff;
+            }
+            flux = rawFlux / totalAmplitude;
+        }
+        _state.prevSpectrum = new Uint8Array(dataArray);
+
+        const now = performance.now();
+        const delta = energy - _state.prevEnergy;
+        if (delta > 0.12 && energy > 0.15) {
+            _state.onsetTimes.push(now);
+        }
+        _state.prevEnergy = energy;
+
+        const cutoff = now - 3000;
+        while (_state.onsetTimes.length > 0 && _state.onsetTimes[0] < cutoff) {
+            _state.onsetTimes.shift();
+        }
+
+        let tempo = 0;
+        if (_state.onsetTimes.length >= 2) {
+            let totalInterval = 0;
+            for (let i = 1; i < _state.onsetTimes.length; i++) {
+                totalInterval += _state.onsetTimes[i] - _state.onsetTimes[i - 1];
+            }
+            const avgInterval = totalInterval / (_state.onsetTimes.length - 1);
+            const bpm = 60000 / avgInterval;
+            tempo = Math.min(1, Math.max(0, (bpm - 40) / 140));
+        }
+
+        let flatness = 0;
+        if (totalAmplitude > 0) {
+            let logSum = 0;
+            let nonZeroCount = 0;
+            for (let i = 1; i < dataArray.length; i++) {
+                if (dataArray[i] > 0) {
+                    logSum += Math.log(dataArray[i]);
+                    nonZeroCount++;
+                }
+            }
+            if (nonZeroCount > 0) {
+                const geometricMean = Math.exp(logSum / nonZeroCount);
+                const arithmeticMean = totalAmplitude / dataArray.length;
+                flatness = Math.min(1, arithmeticMean > 0 ? geometricMean / arithmeticMean : 0);
+            }
+        }
+
+        const bassEnd = Math.max(1, Math.floor(dataArray.length * 0.10));
+        let bassSum = 0;
+        for (let i = 0; i < bassEnd; i++) bassSum += dataArray[i];
+        const bassRatio = totalAmplitude > 0 ? Math.min(1, bassSum / totalAmplitude) : 0;
+
+        let zcr = 0;
+        if (timeDomainArray && timeDomainArray.length > 1) {
+            let crossings = 0;
+            for (let i = 1; i < timeDomainArray.length; i++) {
+                const prev = timeDomainArray[i - 1] - 128;
+                const curr = timeDomainArray[i] - 128;
+                if ((prev >= 0 && curr < 0) || (prev < 0 && curr >= 0)) crossings++;
+            }
+            zcr = crossings / (timeDomainArray.length - 1);
+        }
+
+        return { energy, brightness, tempo, flux, spread, flatness, bassRatio, zcr };
+    }
 </script>
