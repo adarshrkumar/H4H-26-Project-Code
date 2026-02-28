@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { z } from 'zod';
-import { generateAndSave } from '@/lib/generate-and-save';
+import { generateAndSave, GenerateAndSaveError } from '../../lib/generate-and-save';
 
 const requestSchema = z.object({
     text: z.string().min(1, 'text is required').max(5000, 'text is too long'),
@@ -56,14 +56,14 @@ export const POST: APIRoute = async ({ request }) => {
     } catch (error) {
         console.error('[api/generate] failed', error);
 
-        return Response.json(
-            {
-                error:
-                    error instanceof Error
-                        ? error.message
-                        : 'Failed to generate and save audio',
-            },
-            { status: 500 }
-        );
+        if (error instanceof GenerateAndSaveError) {
+            return Response.json({ error: error.message }, { status: error.status });
+        }
+
+        return Response.json({
+            error: error instanceof Error
+                ? error.message
+                : 'Failed to generate and save audio',
+        }, { status: 500 });
     }
 };
