@@ -6,7 +6,7 @@
 // The core stack identifier - change this in ONE place to update everywhere
 const STACK_SHORT_NAME = 'ATSDC';
 
-export const siteConfig = {
+export default {
     // Short name for the stack (used in PWA and compact displays)
     stackShortName: STACK_SHORT_NAME,
 
@@ -20,4 +20,8 @@ export const siteConfig = {
     docsUrl: 'https://github.com/adarshrkumar/The-ATSDC-Stack',
     // GitHub repository URL
     githubUrl: 'https://github.com/adarshrkumar/The-ATSDC-Stack',
+
+    voice_id: 'voice_id',
+
+    model_id: 'eleven_multilingual_v2',
 } as const;
