@@ -3,25 +3,34 @@
  * Central configuration for the application that will be rendered on screen
  */
 
-// The core stack identifier - change this in ONE place to update everywhere
+/**
+ * The core stack identifier - change this in ONE place to update everywhere
+ */
 const STACK_SHORT_NAME = 'ATSDC';
 
-export default {
-    // Short name for the stack (used in PWA and compact displays)
+export const siteConfig = {
+    /**
+     * Short name for the stack (used in PWA and compact displays)
+     */
     stackShortName: STACK_SHORT_NAME,
 
-    // The full name of the stack/framework (derived from stackShortName)
+    /**
+     * The full name of the stack/framework (derived from stackShortName)
+     */
     stackName: `${STACK_SHORT_NAME} Stack`,
 
-    // Full description of the stack
-    stackDescription: 'Full-stack application built with Astro, TypeScript, Convex, and SCSS',
+    /**
+     * Full description of the stack
+     */
+    stackDescription:
+        'Full-stack application built with Astro, TypeScript, Convex, and SCSS',
 
-    // Docs URL
+    /**
+     * Docs URL
+     */
     docsUrl: 'https://github.com/adarshrkumar/The-ATSDC-Stack',
-    // GitHub repository URL
+    /**
+     * GitHub repository URL
+     */
     githubUrl: 'https://github.com/adarshrkumar/The-ATSDC-Stack',
-
-    voice_id: 'voice_id',
-
-    model_id: 'eleven_multilingual_v2',
 } as const;

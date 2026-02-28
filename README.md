@@ -39,6 +39,12 @@ OPENAI_API_KEY="sk-..."
 
 # Exa Search (optional)
 EXA_API_KEY="..."
+
+# ElevenLabs (optional, required for TTS route)
+ELEVENLABS_API_KEY="sk_..."
+
+# UploadThing (optional, required for TTS route)
+UPLOADTHING_TOKEN="..."
 ```
 
 ### Convex Setup
@@ -188,6 +194,8 @@ Make sure to set these environment variables in your Vercel project settings:
 - `BETTER_AUTH_URL`
 - `OPENAI_API_KEY`
 - `EXA_API_KEY` (optional)
+- `ELEVENLABS_API_KEY` (if using ElevenLabs TTS)
+- `UPLOADTHING_TOKEN` (if using UploadThing uploads)
 
 ## 📚 Documentation
 

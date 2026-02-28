@@ -42,6 +42,9 @@ export const createTrack = mutation({
         album: v.optional(v.string()),
         duration: v.optional(v.number()),
         storageId: v.optional(v.id('_storage')),
+        uploadThingKey: v.optional(v.string()),
+        uploadThingUrl: v.optional(v.string()),
+        source: v.optional(v.string()),
         mimeType: v.string(),
     },
     handler: async (ctx, args) => {
@@ -61,6 +64,9 @@ export const updateTrack = mutation({
         album: v.optional(v.string()),
         duration: v.optional(v.number()),
         storageId: v.optional(v.id('_storage')),
+        uploadThingKey: v.optional(v.string()),
+        uploadThingUrl: v.optional(v.string()),
+        source: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
         const { id, ...updates } = args;
