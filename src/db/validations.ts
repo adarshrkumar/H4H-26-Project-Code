@@ -5,7 +5,6 @@ export const createMusicSchema = z.object({
     title: z.string().min(1).max(255).trim().optional().nullable(),
     prompt: z.string().min(1).max(5000).trim().optional().nullable(),
     artist: z.string().max(255).optional().nullable(),
-    album: z.string().max(255).optional().nullable(),
     duration: z.number().positive().optional().nullable(),
     file: z.object({
         key: z.string(),

@@ -59,29 +59,20 @@ function parseResult(value: unknown): GenerateAndSaveResult {
         throw new Error('Invalid response from generate endpoint');
     }
 
-    const { track, file } = value;
-    if (!isRecord(track) || !isRecord(file)) {
-        throw new Error('Missing track or upload data in response');
-    }
-
-    if (typeof file.key !== 'string' || file.key.length === 0) {
-        throw new Error('Missing upload key in response');
-    }
-
-    if (typeof track.title !== 'string' || track.title.length === 0) {
-        throw new Error('Missing track title in response');
-    }
-    if (typeof track.id !== 'string' || track.id.length === 0) {
+    if (typeof value.id !== 'string' || value.id.length === 0) {
         throw new Error('Missing track id in response');
     }
-    if (typeof track._creationTime !== 'number') {
+    if (typeof value.title !== 'string' || value.title.length === 0) {
+        throw new Error('Missing track title in response');
+    }
+    if (typeof value.creationTime !== 'number') {
         throw new Error('Missing track creation time in response');
     }
-    if (typeof track.uploadedAt !== 'number') {
+    if (typeof value.uploadedAt !== 'number') {
         throw new Error('Missing track upload time in response');
     }
 
-    return track as GenerateAndSaveResult;
+    return value;
 }
 
 export async function generateAndSave(

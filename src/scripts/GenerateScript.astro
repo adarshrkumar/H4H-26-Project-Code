@@ -14,18 +14,12 @@
     const sectionsGrid = document.getElementById('sections-grid') as HTMLDivElement;
 
     // --- Types matching the API route response ---
-    interface TrackResponse {
-        _id: string;
+    interface GenerateResponse {
+        id: string;
         title: string;
         artist?: string;
-        album?: string;
-        uploadThingUrl?: string;
         duration?: number;
-    }
-
-    interface GenerateResponse {
-        track: TrackResponse;
-        uploadThing: { key: string; url?: string };
+        file?: { key: string; url?: string };
     }
 
     interface ErrorResponse {
@@ -56,7 +50,7 @@
         suggestionBox.hidden = true;
     }
 
-    function renderTrack(track: TrackResponse, audioUrl: string) {
+    function renderTrack(track: GenerateResponse, audioUrl: string) {
         sectionsGrid.innerHTML = '';
 
         const card = document.createElement('div');
@@ -66,7 +60,7 @@
                 <span class="section-card__name">${track.title}</span>
                 ${track.artist ? `<span class="section-card__duration">${track.artist}</span>` : ''}
             </div>
-            ${track.album ? `<p class="section-card__title">${track.album}</p>` : ''}
+
             <audio class="section-card__audio" controls src="${audioUrl}"></audio>
             <a class="section-card__download btn secondary small"
                href="${audioUrl}"
@@ -111,8 +105,8 @@
             }
 
             const data: GenerateResponse = await res.json();
-            const audioUrl = data.track.uploadThingUrl ?? data.uploadThing.url ?? '';
-            renderTrack(data.track, audioUrl);
+            const audioUrl = data.file?.url ?? '';
+            renderTrack(data, audioUrl);
         } catch {
             showError('Network error — could not reach the server.');
         } finally {
