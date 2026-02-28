@@ -16,8 +16,7 @@ export const siteConfig = {
     stackName: `${STACK_SHORT_NAME} Stack`,
 
     // Full description of the stack
-    stackDescription:
-        'Full-stack application built with Astro, TypeScript, Convex, and SCSS',
+    stackDescription: 'Full-stack application built with Astro, TypeScript, Convex, and SCSS',
 
     // Docs URL
     docsUrl: 'https://github.com/adarshrkumar/The-ATSDC-Stack',
