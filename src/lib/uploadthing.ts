@@ -28,3 +28,9 @@ export async function deleteFile(fileKey: string) {
 export async function listFiles() {
     return await utapi.listFiles();
 }
+
+// getFile
+export async function getFile(fileKey: string) {
+    const { files } = await listFiles();
+    return files.find(file => file.key === fileKey);
+}
