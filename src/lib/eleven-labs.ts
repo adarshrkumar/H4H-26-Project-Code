@@ -8,7 +8,7 @@ export async function generateMusic(prompt: string): Promise<Buffer> {
 
     // Get raw response with headers
     const { data, rawResponse } = await client.textToSpeech.convert('voice_id', {
-        text: 'Hello, world!',
+        text: prompt,
         modelId: 'eleven_multilingual_v2',
     })
     .withRawResponse();
@@ -17,5 +17,12 @@ export async function generateMusic(prompt: string): Promise<Buffer> {
     const charCost = rawResponse.headers.get('x-character-count');
     const requestId = rawResponse.headers.get('request-id');
 
-    return data;
+    const chunks: Uint8Array[] = [];
+    const reader = data.getReader();
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+    }
+    return Buffer.concat(chunks);
 }
