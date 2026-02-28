@@ -407,4 +407,41 @@
     });
 
     micStopBtn.addEventListener('click', stopCapture);
+
+    function drawVisualization() {
+        if (!analyser || (!bufferSource && !sourceNode)) {
+            if (animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
+            resetCanvas();
+            moodDisplay.textContent = '';
+            resetMetricBars();
+            return;
+        }
+
+        animationFrameId = requestAnimationFrame(drawVisualization);
+
+        analyser.getByteFrequencyData(dataArray!);
+        analyser.getByteTimeDomainData(timeDomainArray!);
+
+        const features = getAudioFeatures(dataArray!, timeDomainArray!);
+        const mood = getMood(
+            features.energy,    features.brightness, features.tempo,
+            features.flux,      features.spread,     features.flatness,
+            features.bassRatio, features.zcr
+        );
+        const { l, c, h } = moodToColor(mood, features.energy);
+
+        lchHistory.push({ l, c, h });
+        if (lchHistory.length > numHistoryItems) lchHistory.shift();
+
+        const n    = lchHistory.length;
+        const avgL = lchHistory.reduce((s, v) => s + v.l, 0) / n;
+        const avgC = lchHistory.reduce((s, v) => s + v.c, 0) / n;
+        const avgH = lchHistory.reduce((s, v) => s + v.h, 0) / n;
+
+        canvasCtx.fillStyle = `oklch(${Math.round(avgL)}% ${avgC.toFixed(3)} ${Math.round(avgH)})`;
+        canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+
+        moodDisplay.textContent = mood;
+        updateMetricBars(features);
+    }
 </script>
