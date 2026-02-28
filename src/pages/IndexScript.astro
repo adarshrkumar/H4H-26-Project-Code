@@ -191,4 +191,52 @@
         const l = Math.min(85, Math.max(10, base.baseL + (energy - 0.5) * 30));
         return { color: `oklch(${Math.round(l)}% ${base.chroma} ${base.hue})`, l, c: base.chroma, h: base.hue };
     }
+
+    const METRICS = [
+        { key: 'energy',     label: 'Energy' },
+        { key: 'brightness', label: 'Brightness' },
+        { key: 'tempo',      label: 'Tempo' },
+        { key: 'flux',       label: 'Flux' },
+        { key: 'spread',     label: 'Spread' },
+        { key: 'flatness',   label: 'Flatness' },
+        { key: 'bassRatio',  label: 'Bass Ratio' },
+        { key: 'zcr',        label: 'ZCR' },
+    ];
+
+    const metricsPanel = document.getElementById('metrics')!;
+    for (const { key, label } of METRICS) {
+        metricsPanel.insertAdjacentHTML('beforeend', `
+            <div class="metric-row">
+                <span class="metric-label">${label}</span>
+                <div class="metric-track">
+                    <div class="metric-bar" id="bar-${key}"></div>
+                </div>
+                <span class="metric-value" id="val-${key}">0.00</span>
+            </div>
+        `);
+    }
+
+    const canvas          = document.getElementById('colorCanvas') as HTMLCanvasElement;
+    const canvasCtx       = canvas.getContext('2d')!;
+    const moodDisplay     = document.getElementById('mood')!;
+    const audioFileInput  = document.getElementById('audioFile') as HTMLInputElement;
+    const speakerStartBtn = document.getElementById('speakerStartBtn') as HTMLButtonElement;
+    const speakerStopBtn  = document.getElementById('speakerStopBtn') as HTMLButtonElement;
+    const micStartBtn     = document.getElementById('micStartBtn') as HTMLButtonElement;
+    const micStopBtn      = document.getElementById('micStopBtn') as HTMLButtonElement;
+
+    canvasCtx.fillStyle = '#fff';
+    canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const lchHistory: { l: number; c: number; h: number }[] = [];
+
+    let audioContext:     AudioContext | null = null;
+    let analyser:         AnalyserNode | null = null;
+    let dataArray:        Uint8Array<ArrayBuffer> | null = null;
+    let timeDomainArray:  Uint8Array<ArrayBuffer> | null = null;
+    let animationFrameId: number | null = null;
+    let sourceNode:       MediaStreamAudioSourceNode | null = null;
+    let bufferSource:     AudioBufferSourceNode | null = null;
+    let silentGain:       GainNode | null = null;
+    let mediaStream:      MediaStream | null = null;
 </script>
