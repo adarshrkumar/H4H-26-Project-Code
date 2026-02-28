@@ -67,12 +67,12 @@ export const createPostSchema = z.object({
 
 // Schema for updating an existing post
 export const updatePostSchema = createPostSchema.partial().extend({
-    id: z.string().length(21, 'Invalid post ID'),
+    id: z.string().min(1, 'Post ID is required'),
 });
 
 // Schema for publishing/unpublishing a post
 export const publishPostSchema = z.object({
-    id: z.string().length(21, 'Invalid post ID'),
+    id: z.string().min(1, 'Post ID is required'),
     published: z.boolean(),
 });
 
@@ -98,7 +98,7 @@ export const postQuerySchema = z.object({
 
 // Schema for creating a new comment
 export const createCommentSchema = z.object({
-    postId: z.string().length(21, 'Invalid post ID'),
+    postId: z.string().min(1, 'Post ID is required'),
 
     content: z
         .string()
@@ -117,7 +117,7 @@ export const createCommentSchema = z.object({
 
 // Schema for updating a comment
 export const updateCommentSchema = z.object({
-    id: z.string().length(21, 'Invalid comment ID'),
+    id: z.string().min(1, 'Comment ID is required'),
     content: z
         .string()
         .min(1, 'Comment content is required')
@@ -127,14 +127,14 @@ export const updateCommentSchema = z.object({
 
 // Schema for moderating a comment
 export const moderateCommentSchema = z.object({
-    id: z.string().length(21, 'Invalid comment ID'),
+    id: z.string().min(1, 'Comment ID is required'),
     approved: z.boolean().optional(),
     flagged: z.boolean().optional(),
 });
 
 // Schema for comment query parameters
 export const commentQuerySchema = z.object({
-    postId: z.string().length(21, 'Invalid post ID').optional(),
+    postId: z.string().min(1).optional(),
     page: z.coerce.number().int().positive().default(1),
     limit: z.coerce.number().int().positive().max(100).default(20),
     approved: z

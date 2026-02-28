@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
-import { db } from '@/db/initialize';
-import { posts } from '@/db/schema';
+import { convex } from '@/db/initialize';
+import { api } from '../../../convex/_generated/api';
 import {
     createPostSchema,
     updatePostSchema,
@@ -8,18 +8,11 @@ import {
     type CreatePostInput,
     type UpdatePostInput,
 } from '@/db/validations';
-import { eq, desc, and, ilike, or } from 'drizzle-orm';
 import { z } from 'zod';
 
-/**
- * Posts API Routes
- * Demonstrates CRUD operations with Drizzle ORM, Zod validation, and NanoID
- */
-
 // GET /api/posts - List posts with pagination and filtering
-export const GET: APIRoute = async ({ request, url }) => {
+export const GET: APIRoute = async ({ url }) => {
     try {
-        // Parse and validate query parameters
         const queryParams = {
             page: url.searchParams.get('page'),
             limit: url.searchParams.get('limit'),
@@ -30,84 +23,46 @@ export const GET: APIRoute = async ({ request, url }) => {
         };
 
         const validated = postQuerySchema.parse(queryParams);
+
+        const all = await convex.query(api.posts.listPosts, {
+            published: validated.published,
+            featured: validated.featured,
+            authorId: validated.authorId,
+        });
+
+        const filtered = validated.search
+            ? all.filter(
+                  (p) =>
+                      p.title.toLowerCase().includes(validated.search!.toLowerCase()) ||
+                      p.content.toLowerCase().includes(validated.search!.toLowerCase())
+              )
+            : all;
+
         const offset = (validated.page - 1) * validated.limit;
-
-        // Build query conditions
-        const conditions = [];
-
-        if (validated.published !== undefined) {
-            conditions.push(eq(posts.published, validated.published));
-        }
-
-        if (validated.featured !== undefined) {
-            conditions.push(eq(posts.featured, validated.featured));
-        }
-
-        if (validated.authorId) {
-            conditions.push(eq(posts.authorId, validated.authorId));
-        }
-
-        if (validated.search) {
-            conditions.push(
-                or(
-                    ilike(posts.title, `%${validated.search}%`),
-                    ilike(posts.content, `%${validated.search}%`)
-                )!
-            );
-        }
-
-        // Fetch posts with filtering and pagination
-        const results = await db
-            .select()
-            .from(posts)
-            .where(conditions.length > 0 ? and(...conditions) : undefined)
-            .orderBy(desc(posts.createdAt))
-            .limit(validated.limit)
-            .offset(offset);
+        const paginated = filtered.slice(offset, offset + validated.limit);
 
         return new Response(
             JSON.stringify({
-                data: results,
+                data: paginated,
                 meta: {
                     page: validated.page,
                     limit: validated.limit,
-                    total: results.length,
+                    total: filtered.length,
                 },
             }),
-            {
-                status: 200,
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            }
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
         );
     } catch (error) {
         if (error instanceof z.ZodError) {
             return new Response(
-                JSON.stringify({
-                    error: 'Validation error',
-                    details: error.errors,
-                }),
-                {
-                    status: 400,
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                }
+                JSON.stringify({ error: 'Validation error', details: error.errors }),
+                { status: 400, headers: { 'Content-Type': 'application/json' } }
             );
         }
-
         console.error('GET /api/posts error:', error);
         return new Response(
-            JSON.stringify({
-                error: 'Internal server error',
-            }),
-            {
-                status: 500,
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            }
+            JSON.stringify({ error: 'Internal server error' }),
+            { status: 500, headers: { 'Content-Type': 'application/json' } }
         );
     }
 };
@@ -116,58 +71,32 @@ export const GET: APIRoute = async ({ request, url }) => {
 export const POST: APIRoute = async ({ request }) => {
     try {
         const body = await request.json();
-
-        // Validate request body with Zod
         const validated: CreatePostInput = createPostSchema.parse(body);
 
-        // Insert post into database (NanoID is auto-generated)
-        const [newPost] = await db
-            .insert(posts)
-            .values({
-                ...validated,
-                publishedAt: validated.published ? new Date() : null,
-            })
-            .returning();
+        const newPost = await convex.mutation(api.posts.createPost, {
+            ...validated,
+            excerpt: validated.excerpt ?? undefined,
+            authorName: validated.authorName ?? undefined,
+            metaTitle: validated.metaTitle ?? undefined,
+            metaDescription: validated.metaDescription ?? undefined,
+            publishedAt: validated.published ? Date.now() : undefined,
+        });
 
         return new Response(
-            JSON.stringify({
-                data: newPost,
-                message: 'Post created successfully',
-            }),
-            {
-                status: 201,
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            }
+            JSON.stringify({ data: newPost, message: 'Post created successfully' }),
+            { status: 201, headers: { 'Content-Type': 'application/json' } }
         );
     } catch (error) {
         if (error instanceof z.ZodError) {
             return new Response(
-                JSON.stringify({
-                    error: 'Validation error',
-                    details: error.errors,
-                }),
-                {
-                    status: 400,
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                }
+                JSON.stringify({ error: 'Validation error', details: error.errors }),
+                { status: 400, headers: { 'Content-Type': 'application/json' } }
             );
         }
-
         console.error('POST /api/posts error:', error);
         return new Response(
-            JSON.stringify({
-                error: 'Internal server error',
-            }),
-            {
-                status: 500,
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            }
+            JSON.stringify({ error: 'Internal server error' }),
+            { status: 500, headers: { 'Content-Type': 'application/json' } }
         );
     }
 };
@@ -176,175 +105,82 @@ export const POST: APIRoute = async ({ request }) => {
 export const PUT: APIRoute = async ({ request }) => {
     try {
         const body = await request.json();
-
-        // Validate request body with Zod
         const validated: UpdatePostInput = updatePostSchema.parse(body);
         const { id, ...updateData } = validated;
 
         if (!id) {
             return new Response(
-                JSON.stringify({
-                    error: 'Post ID is required',
-                }),
-                {
-                    status: 400,
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                }
+                JSON.stringify({ error: 'Post ID is required' }),
+                { status: 400, headers: { 'Content-Type': 'application/json' } }
             );
         }
 
-        // Update post in database
-        const [updatedPost] = await db
-            .update(posts)
-            .set({
-                ...updateData,
-                updatedAt: new Date(),
-                publishedAt:
-                    updateData.published !== undefined
-                        ? updateData.published
-                            ? new Date()
-                            : null
-                        : undefined,
-            })
-            .where(eq(posts.id, id))
-            .returning();
+        const updatedPost = await convex.mutation(api.posts.updatePost, {
+            id: id as any,
+            ...updateData,
+            excerpt: updateData.excerpt ?? undefined,
+            authorName: updateData.authorName ?? undefined,
+            metaTitle: updateData.metaTitle ?? undefined,
+            metaDescription: updateData.metaDescription ?? undefined,
+            publishedAt: updateData.published ? Date.now() : undefined,
+        });
 
         if (!updatedPost) {
             return new Response(
-                JSON.stringify({
-                    error: 'Post not found',
-                }),
-                {
-                    status: 404,
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                }
+                JSON.stringify({ error: 'Post not found' }),
+                { status: 404, headers: { 'Content-Type': 'application/json' } }
             );
         }
 
         return new Response(
-            JSON.stringify({
-                data: updatedPost,
-                message: 'Post updated successfully',
-            }),
-            {
-                status: 200,
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            }
+            JSON.stringify({ data: updatedPost, message: 'Post updated successfully' }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
         );
     } catch (error) {
         if (error instanceof z.ZodError) {
             return new Response(
-                JSON.stringify({
-                    error: 'Validation error',
-                    details: error.errors,
-                }),
-                {
-                    status: 400,
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                }
+                JSON.stringify({ error: 'Validation error', details: error.errors }),
+                { status: 400, headers: { 'Content-Type': 'application/json' } }
             );
         }
-
         console.error('PUT /api/posts error:', error);
         return new Response(
-            JSON.stringify({
-                error: 'Internal server error',
-            }),
-            {
-                status: 500,
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            }
+            JSON.stringify({ error: 'Internal server error' }),
+            { status: 500, headers: { 'Content-Type': 'application/json' } }
         );
     }
 };
 
 // DELETE /api/posts - Delete a post
-export const DELETE: APIRoute = async ({ request, url }) => {
+export const DELETE: APIRoute = async ({ url }) => {
     try {
         const id = url.searchParams.get('id');
 
         if (!id) {
             return new Response(
-                JSON.stringify({
-                    error: 'Post ID is required',
-                }),
-                {
-                    status: 400,
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                }
+                JSON.stringify({ error: 'Post ID is required' }),
+                { status: 400, headers: { 'Content-Type': 'application/json' } }
             );
         }
 
-        // Validate ID format (NanoID is 21 characters)
-        if (id.length !== 21) {
-            return new Response(
-                JSON.stringify({
-                    error: 'Invalid post ID format',
-                }),
-                {
-                    status: 400,
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                }
-            );
-        }
-
-        // Delete post from database
-        const [deletedPost] = await db
-            .delete(posts)
-            .where(eq(posts.id, id))
-            .returning();
+        const deletedPost = await convex.mutation(api.posts.deletePost, { id: id as any });
 
         if (!deletedPost) {
             return new Response(
-                JSON.stringify({
-                    error: 'Post not found',
-                }),
-                {
-                    status: 404,
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                }
+                JSON.stringify({ error: 'Post not found' }),
+                { status: 404, headers: { 'Content-Type': 'application/json' } }
             );
         }
 
         return new Response(
-            JSON.stringify({
-                message: 'Post deleted successfully',
-            }),
-            {
-                status: 200,
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            }
+            JSON.stringify({ message: 'Post deleted successfully' }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
         );
     } catch (error) {
         console.error('DELETE /api/posts error:', error);
         return new Response(
-            JSON.stringify({
-                error: 'Internal server error',
-            }),
-            {
-                status: 500,
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            }
+            JSON.stringify({ error: 'Internal server error' }),
+            { status: 500, headers: { 'Content-Type': 'application/json' } }
         );
     }
 };
