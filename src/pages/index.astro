@@ -2,6 +2,7 @@
 import Layout from '@/layouts/Layout.astro';
 import '@/styles/pages/index.scss';
 import IndexScript from '../scripts/IndexScript.astro';
+import { METRICS } from '@/lib/metrics';
 ---
 
 <Layout pageTitle="Home">
@@ -32,7 +33,21 @@ import IndexScript from '../scripts/IndexScript.astro';
         <canvas id="colorCanvas" class="color-canvas" width="660" height="340"></canvas>
     </div>
 
-    <div id="metrics" class="metrics"></div>
+    <div id="instrument-results" class="instrument-results">
+        <p class="instrument-status">—</p>
+    </div>
+
+    <div id="metrics" class="metrics">
+        {METRICS.map(({ key, label }) => (
+            <div class="metric-row">
+                <span class="metric-label">{label}</span>
+                <div class="metric-track">
+                    <div class={`metric-bar bar-${key}`} id={`bar-${key}`}></div>
+                </div>
+                <span class={`metric-value val-${key}`} id={`val-${key}`}>0.00</span>
+            </div>
+        ))}
+    </div>
 
     <IndexScript />
 </Layout>

@@ -21,6 +21,95 @@
     const SPIKE_INTENSITY_MOD = -0.55; // Negative = lower exponent on loud sounds (spikier/taller)
     const SPIKE_SCALE         = 1.40; // Vertical scale multiplier
 
+    // ── Instrument Classification ─────────────────────────────────────────────
+    const INSTRUMENT_MODEL  = 'onnx-community/Musical-Instrument-Classification-ONNX';
+    const CLASSIFY_EVERY_MS = 3000;  // run inference at most every 3 s
+    const PCM_16K_LEN       = 48000; // 3 s at 16 kHz
+
+    const pcm16k                  = new Float32Array(PCM_16K_LEN);
+    let   pcmPos                  = 0;
+    let   pcmCount                = 0;
+    let   classifierPipeline: any = null;
+    let   classifierReady         = false;
+    let   classifierLoading       = false;
+    let   classifying             = false;
+    let   lastClassifyTime        = 0;
+
+    const instrumentResults = document.getElementById('instrument-results') as HTMLElement;
+
+    function setInstrumentStatus(text: string, state: string) {
+        if (!instrumentResults) return;
+        instrumentResults.innerHTML = `<p class="instrument-status" data-state="${state}">${text}</p>`;
+    }
+
+    function downsampleChunk(input: Uint8Array, srcSR: number): Float32Array {
+        const ratio  = srcSR / 16000;
+        const outLen = Math.floor(input.length / ratio);
+        const out    = new Float32Array(outLen);
+        for (let i = 0; i < outLen; i++) {
+            const srcIdx = i * ratio;
+            const lo     = Math.floor(srcIdx);
+            const hi     = Math.min(lo + 1, input.length - 1);
+            const frac   = srcIdx - lo;
+            out[i]       = ((input[lo] - 128) / 128) * (1 - frac)
+                         + ((input[hi] - 128) / 128) * frac;
+        }
+        return out;
+    }
+
+    function appendPCM(samples: Float32Array) {
+        for (let i = 0; i < samples.length; i++) {
+            pcm16k[pcmPos] = samples[i];
+            pcmPos = (pcmPos + 1) % PCM_16K_LEN;
+        }
+        pcmCount = Math.min(pcmCount + samples.length, PCM_16K_LEN);
+    }
+
+    function getRecentPCM(): Float32Array {
+        if (pcmCount < PCM_16K_LEN) return pcm16k.slice(0, pcmCount);
+        const out  = new Float32Array(PCM_16K_LEN);
+        const tail = PCM_16K_LEN - pcmPos;
+        out.set(pcm16k.subarray(pcmPos), 0);
+        out.set(pcm16k.subarray(0, pcmPos), tail);
+        return out;
+    }
+
+    async function initClassifier() {
+        if (classifierReady || classifierLoading) return;
+        classifierLoading = true;
+        setInstrumentStatus('Loading instrument model…', 'loading');
+        try {
+            const { pipeline } = await import('@huggingface/transformers');
+            classifierPipeline = await pipeline('audio-classification', INSTRUMENT_MODEL, { dtype: 'q8' });
+            classifierReady    = true;
+            setInstrumentStatus('Model ready — listening…', 'ready');
+        } catch (err) {
+            console.error('Instrument model failed to load:', err);
+            setInstrumentStatus('Model unavailable (see console)', 'error');
+        } finally {
+            classifierLoading = false;
+        }
+    }
+
+    async function runClassification() {
+        if (classifying || !classifierReady || !instrumentResults) return;
+        classifying = true;
+        try {
+            const audio  = getRecentPCM();
+            const result = await classifierPipeline(audio, { topk: null }) as { label: string; score: number }[];
+            instrumentResults.innerHTML = result.map(({ label, score }) => `
+                <div class="instr-row">
+                    <span class="instr-label">${label}</span>
+                    <div class="instr-track"><div class="instr-bar" style="width:${(score * 100).toFixed(2)}%"></div></div>
+                    <span class="instr-value">${(score * 100).toFixed(1)}%</span>
+                </div>
+            `).join('');
+        } catch (err) {
+            console.error('Classification error:', err);
+        } finally {
+            classifying = false;
+        }
+    }
 
     function getAudioFeatures(dataArray: Uint8Array, timeDomainArray?: Uint8Array) {
         const N      = dataArray.length;
@@ -406,53 +495,7 @@
         return lastLCH;
     }
 
-    const METRICS = [
-        // Original
-        { key: 'energy',          label: 'Energy' },
-        { key: 'brightness',      label: 'Brightness' },
-        { key: 'tempo',           label: 'Tempo' },
-        { key: 'flux',            label: 'Flux' },
-        { key: 'spread',          label: 'Spread' },
-        { key: 'flatness',        label: 'Flatness' },
-        { key: 'bassRatio',       label: 'Bass Ratio' },
-        { key: 'zcr',             label: 'ZCR' },
-        // Frequency bands
-        { key: 'rolloff',         label: 'Rolloff' },
-        { key: 'subBass',         label: 'Sub-bass' },
-        { key: 'midRatio',        label: 'Mid Ratio' },
-        { key: 'highRatio',       label: 'High Ratio' },
-        // Time-domain
-        { key: 'rms',             label: 'RMS' },
-        { key: 'crestFactor',     label: 'Crest Factor' },
-        { key: 'dynamicRange',    label: 'Dyn. Range' },
-        // Spectral structure
-        { key: 'spectralContrast', label: 'Contrast' },
-        { key: 'harmonicRatio',   label: 'Harmonic' },
-        // Tonal
-        { key: 'chromaStrength',  label: 'Chroma Str.' },
-        { key: 'dominantPitch',   label: 'Dom. Pitch' },
-        { key: 'pitch',           label: 'Pitch' },
-        // Rhythmic / temporal
-        { key: 'attackTime',      label: 'Attack' },
-        { key: 'beatRegularity',  label: 'Beat Reg.' },
-        // Perceptual
-        { key: 'roughness',       label: 'Roughness' },
-        { key: 'mfcc1',           label: 'MFCC-1' },
-        { key: 'tonnetz',         label: 'Tonnetz' },
-    ];
-
-    const metricsPanel = document.getElementById('metrics')!;
-    for (const { key, label } of METRICS) {
-        metricsPanel.insertAdjacentHTML('beforeend', `
-            <div class="metric-row">
-                <span class="metric-label">${label}</span>
-                <div class="metric-track">
-                    <div class="metric-bar bar-${key}" id="bar-${key}"></div>
-                </div>
-                <span class="metric-value val-${key}" id="val-${key}">0.00</span>
-            </div>
-        `);
-    }
+    import { METRICS } from '@/lib/metrics';
 
     const canvas          = document.getElementById('colorCanvas') as HTMLCanvasElement;
     const canvasCtx       = canvas.getContext('2d')!;
@@ -539,6 +582,9 @@
         state.pulseProgress = 0;
         lchHistory.length = 0;
         state.energyHistory.length = 0;
+        pcmCount = 0;
+        pcmPos   = 0;
+        setInstrumentStatus('—', '');
         resetCanvas();
         resetMetricBars();
     }
@@ -660,6 +706,15 @@
         analyser.getByteFrequencyData(dataArray!);
         analyser.getByteTimeDomainData(timeDomainArray!);
 
+        // ── Instrument classification ─────────────────────────────────────────
+        appendPCM(downsampleChunk(timeDomainArray!, state.sampleRate));
+        const classifyNow = performance.now();
+        if (classifierReady && !classifying && pcmCount >= PCM_16K_LEN / 2
+                && classifyNow - lastClassifyTime > CLASSIFY_EVERY_MS) {
+            lastClassifyTime = classifyNow;
+            runClassification();
+        }
+
         const features    = getAudioFeatures(dataArray!, timeDomainArray!);
         const { l, c, h } = metricsToColor(features);
 
@@ -717,4 +772,6 @@
 
         updateMetricBars(features);
     }
+
+    initClassifier();
 </script>
