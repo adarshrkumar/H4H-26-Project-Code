@@ -21,7 +21,7 @@ export async function getFile(fileKey: string) {
 
 // getFileUrl
 export async function getFileUrl(fileKey: string) {
-    return await utapi.getFileUrl(fileKey);
+    return await utapi.getFileUrls(fileKey);
 }
 
 // deleteFile
