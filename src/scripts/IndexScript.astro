@@ -863,7 +863,7 @@
         }
 
         canvasCtx.restore();
-        updateMetricBars(features);
+        updateMetricBars(features as unknown as Record<string, number>);
     }
 
     initClassifier();
