@@ -307,12 +307,12 @@
     document.querySelectorAll('.tab').forEach(tab => {
         tab.addEventListener('click', () => {
             const mode = (tab as HTMLElement).dataset.mode;
-            if (tab.classList.contains('active')) return;
+            if ((tab as HTMLElement).dataset.state === 'active') return;
             stopCapture();
             document.querySelectorAll('.tab').forEach(t =>
-                t.classList.toggle('active', t === tab));
+                ((t as HTMLElement).dataset.state = t === tab ? 'active' : ''));
             document.querySelectorAll('.ctrl-panel').forEach(p =>
-                p.classList.toggle('active', p.id === `ctrl-${mode}`));
+                ((p as HTMLElement).dataset.state = p.id === `ctrl-${mode}` ? 'active' : ''));
             audioFileInput.value = '';
         });
     });
