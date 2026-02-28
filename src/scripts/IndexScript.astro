@@ -69,7 +69,7 @@
         instrumentLabel.textContent   = 'Loading instrument model…';
         try {
             const { pipeline } = await import('@huggingface/transformers');
-            classifierPipeline = await pipeline('audio-classification', INSTRUMENT_MODEL);
+            classifierPipeline = await pipeline('audio-classification', INSTRUMENT_MODEL, { dtype: 'q8' });
             classifierReady    = true;
             instrumentLabel.dataset.state = 'ready';
             instrumentLabel.textContent   = 'Model ready — listening…';
