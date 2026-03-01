@@ -1,6 +1,6 @@
-# ATDSS Stack Application
+# Huephonics
 
-This is the main Astro application for the ATDSS Stack (Astro, TypeScript, Drizzle, SCSS, Vercel AI SDK).
+Huephonics - Audio visualization powered by mood color (Astro, TypeScript, Drizzle, SCSS, Vercel AI SDK).
 
 ## 🚀 Quick Start
 

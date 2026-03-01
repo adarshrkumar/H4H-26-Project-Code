@@ -24,7 +24,7 @@ npm run ts <file.ts>            # node --experimental-strip-types
 
 ## Architecture
 
-**Stack (ATDSS)**: Astro 5 + TypeScript + Drizzle + SCSS + Vercel AI SDK
+# Huephonics Astro 5 + TypeScript + Drizzle + SCSS + Vercel AI SDK
 
 **Rendering**: Server-side (`output: 'server'`) via `@astrojs/vercel` adapter.
 

@@ -21,8 +21,8 @@ export default defineConfig({
                 registerType: 'autoUpdate',
                 includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
                 manifest: {
-                    name: 'gem-music',
-                    short_name: 'gem-music',
+                    name: 'Huephonics',
+                    short_name: 'Huephonics',
                     description: 'Music generation with audio-to-color visualization',
                     theme_color: '#ffffff',
                     background_color: '#ffffff',

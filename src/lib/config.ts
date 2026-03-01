@@ -1,6 +1,6 @@
 export const siteConfig = {
-    name: 'gem-music',
-    stackName: 'ATDSS',
+    name: 'Huephonics',
+    stackName: 'Huephonics',
     description:
         'Full-stack application built with Astro, TypeScript, Drizzle, and SCSS',
     stackDescription: 'Astro + TypeScript + Drizzle + SCSS + Vercel AI SDK',
