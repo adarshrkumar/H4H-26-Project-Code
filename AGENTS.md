@@ -24,7 +24,7 @@ npm run ts <file.ts>            # node --experimental-strip-types
 
 ## Architecture
 
-**Stack (ATSDC)**: Astro 5 + TypeScript + SCSS + Drizzle + (Client/SDK)
+**Stack (ATSDC)**: Astro 5 + TypeScript + SCSS + Drizzle
 
 **Rendering**: Server-side (`output: 'server'`) via `@astrojs/vercel` adapter.
 
