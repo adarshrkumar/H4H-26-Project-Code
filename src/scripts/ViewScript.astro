@@ -889,12 +889,11 @@
 
         canvasCtx.restore();
 
-        // ── F. Beat glow box-shadow ───────────────────────────────────────────
+        // ── F. Beat glow outline ──────────────────────────────────────────────
         glowIntensity *= 0.88;
-        const spread = Math.round(glowIntensity * 40);
-        const blur   = Math.round(glowIntensity * 60);
-        canvas.style.boxShadow = glowIntensity > 0.02
-            ? `0 0 ${blur}px ${spread}px oklch(${waveColor.l}% ${waveColor.c} ${waveColor.h} / ${(glowIntensity * 0.7).toFixed(3)})`
+        const outlineWidth = Math.round(glowIntensity * 4);
+        canvas.style.outline = glowIntensity > 0.02
+            ? `${outlineWidth}px solid oklch(${waveColor.l}% ${waveColor.c} ${waveColor.h} / ${(glowIntensity * 0.9).toFixed(3)})`
             : 'none';
         const { isBeat: _isBeat, ...numericFeatures } = features;
         updateMetricBars(numericFeatures);
