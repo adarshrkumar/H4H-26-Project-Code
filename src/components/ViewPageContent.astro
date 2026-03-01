@@ -5,10 +5,16 @@ import ViewScript from '@/scripts/ViewScript.astro';
 interface Props {
     music: {
         id: string;
-        title: string;
-        filename: string;
-        createdAt: string;
-    };
+        title: string | null;
+        file?: unknown;
+        prompt?: string | null;
+        artist?: string | null;
+        duration?: number | null;
+        source?: string | null;
+        mimeType?: string | null;
+        createdAt?: Date | null;
+        updatedAt?: Date | null;
+    } | null;
     audioUrl: string;
     errorMessage?: string;
 }

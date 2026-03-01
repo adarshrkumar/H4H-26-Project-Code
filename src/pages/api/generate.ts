@@ -10,9 +10,10 @@ const OUTPUT_FORMAT = 'mp3_44100_128' as const;
 let _music: Music | null = null;
 function getMusic(): Music {
     if (!_music) {
-        const apiKey =
-            (import.meta as unknown as { env: Record<string, string> }).env?.ELEVENLABS_API_KEY ??
-            process.env.ELEVENLABS_API_KEY;
+        const apiKey = import.meta.env.ELEVENLABS_API_KEY ?? process.env.ELEVENLABS_API_KEY;
+        if (!apiKey) {
+            throw new Error('ELEVENLABS_API_KEY is not set');
+        }
         _music = new Music({ apiKey });
     }
     return _music;
@@ -88,15 +89,14 @@ export const POST: APIRoute = async ({ request }) => {
         const uploadFilename = `${songTitle.replace(/[^a-z0-9_-]/gi, '_')}.mp3`;
         const file = new File([new Uint8Array(audio)], uploadFilename, { type: 'audio/mpeg' });
         const uploaded = await uploadFile(file);
-        fileKey = (uploaded as any)?.key || (uploaded.data as any)?.key || '';
-        if (!fileKey) {
-            throw new Error('No file key returned from upload');
+
+        if (uploaded.error !== null) {
+            throw new Error(`Upload failed: ${String(uploaded.error)}`);
         }
+
+        fileKey = uploaded.data?.key || '';
         fileUrl = getFileUrl(fileKey);
-        if (!fileUrl) {
-            throw new Error('Failed to generate file URL');
-        }
-    } catch (err) {
+    } catch (err: unknown) {
         console.error('[api/generate] UploadThing error:', err);
         return Response.json({ error: 'Failed to upload audio' }, { status: 500 });
     }

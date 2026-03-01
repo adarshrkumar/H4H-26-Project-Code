@@ -15,17 +15,18 @@ try {
     if (!id) {
         throw new Error('No music ID provided');
     }
-    
+
     music = await getRecording(id);
-    
+
     if (!music) {
         errorMessage = 'Music not found';
     } else {
         // Get the file URL - either from stored data or reconstruct from UploadThing
-        const fileKey = (music.file as any)?.key || id;
+        const file = music.file as { key?: string } | undefined;
+        const fileKey = file?.key || id;
         audioUrl = getFileUrl(fileKey);
     }
-} catch (err) {
+} catch (err: unknown) {
     errorMessage = err instanceof Error ? err.message : 'Failed to load music';
 }
 ---

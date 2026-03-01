@@ -670,8 +670,8 @@
             speakerStartBtn.disabled = true;
             speakerStopBtn.disabled  = false;
             if (!animationFrameId) drawVisualization();
-        } catch (err: any) {
-            if (err.name !== 'NotAllowedError') {
+        } catch (err: unknown) {
+            if (err instanceof Error && err.name !== 'NotAllowedError') {
                 console.error('Speaker capture error:', err);
                 alert('Could not start audio capture.');
             }
@@ -699,8 +699,8 @@
             micStartBtn.disabled = true;
             micStopBtn.disabled  = false;
             if (!animationFrameId) drawVisualization();
-        } catch (err: any) {
-            if (err.name !== 'NotAllowedError') {
+        } catch (err: unknown) {
+            if (err instanceof Error && err.name !== 'NotAllowedError') {
                 console.error('Microphone error:', err);
                 alert('Could not access the microphone.');
             }
