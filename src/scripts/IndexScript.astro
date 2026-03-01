@@ -12,103 +12,27 @@
         pulseLCH:      { l: 70, c: 0.15, h: 200 }
     };
 
-    const MIN_THRESHOLD  = 0.01;
-    const NUM_HISTORY    = 200;
-    const ENERGY_HISTORY = 10;
+    const ENERGY_HISTORY     = 10;
+    const TARGET_FPS         = 60;
+    const FRAME_INTERVAL_MS  = 1000 / TARGET_FPS;
+    const WAVEFORM_MIN_ENERGY = 0.01;
+    const WAVEFORM_LINE_WIDTH = 0.85;
+    const MAX_BEAT_RINGS      = 16;
 
     // Waveform spikiness constants
     const SPIKE_BASE_EXP      = 1.15; // High exponent = smaller quiet sounds (tighter)
     const SPIKE_INTENSITY_MOD = -0.55; // Negative = lower exponent on loud sounds (spikier/taller)
     const SPIKE_SCALE         = 1.40; // Vertical scale multiplier
 
-    // ── Instrument Classification ─────────────────────────────────────────────
-    const INSTRUMENT_MODEL  = 'onnx-community/Musical-Instrument-Classification-ONNX';
-    const CLASSIFY_EVERY_MS = 3000;  // run inference at most every 3 s
-    const PCM_16K_LEN       = 48000; // 3 s at 16 kHz
-
-    const pcm16k                  = new Float32Array(PCM_16K_LEN);
-    let   pcmPos                  = 0;
-    let   pcmCount                = 0;
-    let   classifierPipeline: any = null;
-    let   classifierReady         = false;
-    let   classifierLoading       = false;
-    let   classifying             = false;
-    let   lastClassifyTime        = 0;
+    // ── Instrument Estimation (lightweight alternative to model inference) ───
+    const INSTRUMENT_UPDATE_MS = 1000;
+    let   lastInstrumentUpdate = 0;
 
     const instrumentResults = document.getElementById('instrument-results') as HTMLElement;
 
     function setInstrumentStatus(text: string, state: string) {
         if (!instrumentResults) return;
         instrumentResults.innerHTML = `<p class="instrument-status" data-state="${state}">${text}</p>`;
-    }
-
-    function downsampleChunk(input: Uint8Array, srcSR: number): Float32Array {
-        const ratio  = srcSR / 16000;
-        const outLen = Math.floor(input.length / ratio);
-        const out    = new Float32Array(outLen);
-        for (let i = 0; i < outLen; i++) {
-            const srcIdx = i * ratio;
-            const lo     = Math.floor(srcIdx);
-            const hi     = Math.min(lo + 1, input.length - 1);
-            const frac   = srcIdx - lo;
-            out[i]       = ((input[lo] - 128) / 128) * (1 - frac)
-                         + ((input[hi] - 128) / 128) * frac;
-        }
-        return out;
-    }
-
-    function appendPCM(samples: Float32Array) {
-        for (let i = 0; i < samples.length; i++) {
-            pcm16k[pcmPos] = samples[i];
-            pcmPos = (pcmPos + 1) % PCM_16K_LEN;
-        }
-        pcmCount = Math.min(pcmCount + samples.length, PCM_16K_LEN);
-    }
-
-    function getRecentPCM(): Float32Array {
-        if (pcmCount < PCM_16K_LEN) return pcm16k.slice(0, pcmCount);
-        const out  = new Float32Array(PCM_16K_LEN);
-        const tail = PCM_16K_LEN - pcmPos;
-        out.set(pcm16k.subarray(pcmPos), 0);
-        out.set(pcm16k.subarray(0, pcmPos), tail);
-        return out;
-    }
-
-    async function initClassifier() {
-        if (classifierReady || classifierLoading) return;
-        classifierLoading = true;
-        setInstrumentStatus('Loading instrument model…', 'loading');
-        try {
-            const { pipeline } = await import('@huggingface/transformers');
-            classifierPipeline = await pipeline('audio-classification', INSTRUMENT_MODEL, { dtype: 'q8' });
-            classifierReady    = true;
-            setInstrumentStatus('Model ready — listening…', 'ready');
-        } catch (err) {
-            console.error('Instrument model failed to load:', err);
-            setInstrumentStatus('Model unavailable (see console)', 'error');
-        } finally {
-            classifierLoading = false;
-        }
-    }
-
-    async function runClassification() {
-        if (classifying || !classifierReady || !instrumentResults) return;
-        classifying = true;
-        try {
-            const audio  = getRecentPCM();
-            const result = await classifierPipeline(audio, { topk: null }) as { label: string; score: number }[];
-            instrumentResults.innerHTML = result.map(({ label, score }) => `
-                <div class="instr-row">
-                    <span class="instr-label">${label}</span>
-                    <div class="instr-track"><div class="instr-bar" style="width:${(score * 100).toFixed(2)}%"></div></div>
-                    <span class="instr-value">${(score * 100).toFixed(1)}%</span>
-                </div>
-            `).join('');
-        } catch (err) {
-            console.error('Classification error:', err);
-        } finally {
-            classifying = false;
-        }
     }
 
     function getAudioFeatures(dataArray: Uint8Array, timeDomainArray?: Uint8Array) {
@@ -143,7 +67,7 @@
 
         // ── flux ─────────────────────────────────────────────────────────────
         let flux = 0;
-        if (state.prevSpectrum && totalAmplitude > 0) {
+        if (state.prevSpectrum && state.prevSpectrum.length === N && totalAmplitude > 0) {
             let rawFlux = 0;
             for (let i = 0; i < N; i++) {
                 const diff = dataArray[i] - state.prevSpectrum[i];
@@ -151,7 +75,10 @@
             }
             flux = rawFlux / totalAmplitude;
         }
-        state.prevSpectrum = new Uint8Array(dataArray);
+        if (!state.prevSpectrum || state.prevSpectrum.length !== N) {
+            state.prevSpectrum = new Uint8Array(N);
+        }
+        state.prevSpectrum.set(dataArray);
 
         // ── onset / tempo ────────────────────────────────────────────────────
         // Track a slow EMA of energy as a local "baseline".
@@ -367,12 +294,18 @@
         // ── beatRegularity (1 − coefficient of variation of onset intervals) ──
         let beatRegularity = 0;
         if (state.onsetTimes.length >= 3) {
-            const intervals: number[] = [];
-            for (let i = 1; i < state.onsetTimes.length; i++)
-                intervals.push(state.onsetTimes[i] - state.onsetTimes[i - 1]);
-            const mean     = intervals.reduce((s, v) => s + v, 0) / intervals.length;
-            const variance = intervals.reduce((s, v) => s + (v - mean) ** 2, 0) / intervals.length;
-            const cv       = mean > 0 ? Math.sqrt(variance) / mean : 1;
+            const intervalCount = state.onsetTimes.length - 1;
+            let intervalSum = 0;
+            for (let i = 1; i < state.onsetTimes.length; i++) {
+                intervalSum += state.onsetTimes[i] - state.onsetTimes[i - 1];
+            }
+            const mean = intervalSum / intervalCount;
+            let varianceSum = 0;
+            for (let i = 1; i < state.onsetTimes.length; i++) {
+                const diff = (state.onsetTimes[i] - state.onsetTimes[i - 1]) - mean;
+                varianceSum += diff * diff;
+            }
+            const cv = mean > 0 ? Math.sqrt(varianceSum / intervalCount) / mean : 1;
             beatRegularity = Math.max(0, 1 - Math.min(1, cv));
         }
 
@@ -441,26 +374,8 @@
     }
 
     type Features = ReturnType<typeof getAudioFeatures>;
-
-    // ── A. Layered frequency-color bars ──────────────────────────────────────
-    type LayerBand  = { e: number; l: number; c: number; h: number };
-    type LayerFrame = { bass: LayerBand; mid: LayerBand; high: LayerBand };
-    const smBand = {
-        bass: { l: 15, c: 0.20, h: 265 },
-        mid:  { l: 15, c: 0.20, h: 120 },
-        high: { l: 15, c: 0.20, h: 10  },
-    };
-
-    // ── C. Beat rings ─────────────────────────────────────────────────────────
     type Ring = { x: number; y: number; r: number; maxR: number; h: number };
     const rings: Ring[] = [];
-
-    // ── D. Particles ──────────────────────────────────────────────────────────
-    type Particle = { x: number; y: number; vx: number; vy: number; age: number; life: number; h: number; sz: number };
-    const ptcls: Particle[] = [];
-
-    // ── E. Screen shake ───────────────────────────────────────────────────────
-    let shakeAmt = 0;
 
     // ── Mood system ───────────────────────────────────────────────────────────
     const moodW = { calm: 0.5, energetic: 0, sad: 0, angry: 0, dreamy: 0.5 };
@@ -493,69 +408,147 @@
         return best;
     }
 
-    function computeLayers(f: Features): LayerFrame {
-        const sm   = 0.08;
-        const lerp = (a: number, b: number) => a * (1 - sm) + b * sm;
-        const [bH0, mH0, hH0] = MOOD_HUE[dominantMood()];
+    function drawColorField(features: Features) {
+        const [bassHue, midHue, highHue] = MOOD_HUE[dominantMood()];
+        const targetL = Math.min(85, Math.max(8, 10 + features.energy * 70));
+        const targetC = Math.min(0.28, Math.max(0.03, 0.05 + features.harmonicRatio * 0.16 + features.flatness * 0.04));
+        const targetH = (midHue * 0.55 + bassHue * 0.25 + highHue * 0.20 + features.pitch * 30 + features.brightness * 22) % 360;
 
-        const bassE = Math.max(f.subBass * 0.6 + f.bassRatio * 0.4, 0.001);
-        const midE  = f.midRatio;
-        const highE = f.highRatio;
+        const ease = 0.14;
+        state.pulseLCH.l = state.pulseLCH.l * (1 - ease) + targetL * ease;
+        state.pulseLCH.c = state.pulseLCH.c * (1 - ease) + targetC * ease;
 
-        smBand.bass.l = lerp(smBand.bass.l, 10 + bassE * 60);
-        smBand.bass.c = lerp(smBand.bass.c, 0.12 + bassE * 0.24);
-        smBand.bass.h = lerp(smBand.bass.h, bH0 + f.subBass * 30);
+        const delta = ((targetH - state.pulseLCH.h + 540) % 360) - 180;
+        state.pulseLCH.h = (state.pulseLCH.h + delta * ease + 360) % 360;
 
-        smBand.mid.l  = lerp(smBand.mid.l,  10 + midE * 70);
-        smBand.mid.c  = lerp(smBand.mid.c,  0.12 + midE * 0.24);
-        smBand.mid.h  = lerp(smBand.mid.h,  mH0 + f.brightness * 40);
-
-        smBand.high.l = lerp(smBand.high.l, 10 + highE * 85);
-        smBand.high.c = lerp(smBand.high.c, Math.max(0.04, 0.26 - highE * 0.12));
-        smBand.high.h = lerp(smBand.high.h, hH0 + f.highRatio * 20);
-
-        return {
-            bass: { e: bassE, ...smBand.bass },
-            mid:  { e: midE,  ...smBand.mid  },
-            high: { e: highE, ...smBand.high },
-        };
+        const glowL = Math.min(95, state.pulseLCH.l + 8 + features.intensity * 10);
+        const glowC = Math.min(0.32, state.pulseLCH.c + 0.03);
+        const gradient = canvasCtx.createRadialGradient(
+            canvas.width * 0.5,
+            canvas.height * 0.5,
+            canvas.height * 0.10,
+            canvas.width * 0.5,
+            canvas.height * 0.5,
+            canvas.width * 0.72,
+        );
+        gradient.addColorStop(0, `oklch(${glowL}% ${glowC} ${state.pulseLCH.h})`);
+        gradient.addColorStop(1, `oklch(${state.pulseLCH.l}% ${state.pulseLCH.c} ${state.pulseLCH.h})`);
+        canvasCtx.fillStyle = gradient;
+        canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
-    function spawnBeatEffects(f: Features, cx: number, cy: number) {
-        const isOnset = f.attackTime > 0.25 && f.energy > 0.05;
+    function drawWaveformLine(timeDomain: Uint8Array, features: Features) {
+        if (features.energy < WAVEFORM_MIN_ENERGY) return;
+
+        canvasCtx.strokeStyle = `oklch(80% 0.14 ${state.pulseLCH.h} / 0.5)`;
+        canvasCtx.lineWidth = WAVEFORM_LINE_WIDTH;
+        canvasCtx.beginPath();
+
+        const cy = canvas.height / 2;
+        const step = canvas.width / timeDomain.length;
+        for (let i = 0; i < timeDomain.length; i++) {
+            const v = (timeDomain[i] / 128) - 1;
+            const y = cy + v * cy * 0.62;
+            if (i === 0) canvasCtx.moveTo(0, y);
+            else canvasCtx.lineTo(i * step, y);
+        }
+        canvasCtx.stroke();
+    }
+
+    function spawnCenterRing(features: Features) {
+        const isOnset = features.isBeat || (features.attackTime > 0.24 && features.energy > 0.04);
         if (!isOnset) return;
 
-        // C. Ring
+        if (rings.length >= MAX_BEAT_RINGS) rings.shift();
         rings.push({
-            x: cx, y: cy,
-            r: 8,
-            maxR: (Math.min(cx, cy)) * (0.5 + f.energy * 0.8),
-            h: smBand.bass.h,
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            r: 10,
+            maxR: Math.min(canvas.width, canvas.height) * (0.18 + features.energy * 0.42),
+            h: state.pulseLCH.h,
         });
-
-        // D. Particles on stronger beats
-        if (f.energy > 0.12) {
-            const count = Math.round(6 + f.energy * 12);
-            const hues  = [smBand.bass.h, smBand.mid.h, smBand.high.h];
-            for (let i = 0; i < count; i++) {
-                const angle = (Math.PI * 2 * i / count) + Math.random() * 0.4;
-                const speed = 1.5 + f.energy * 4.5 + Math.random() * 2;
-                ptcls.push({
-                    x: cx, y: cy,
-                    vx: Math.cos(angle) * speed,
-                    vy: Math.sin(angle) * speed,
-                    age: 0, life: 40 + Math.random() * 30,
-                    h: hues[i % 3],
-                    sz: 2 + f.energy * 4,
-                });
-            }
-        }
-
-        // E. Screen shake on strong beat
-        if (f.energy > 0.35) shakeAmt = Math.min(8, f.energy * 12);
     }
 
-    import { METRICS } from '@/lib/metrics';
+    function drawCenterRings() {
+        for (let i = rings.length - 1; i >= 0; i--) {
+            const ring = rings[i];
+            const t = ring.r / ring.maxR;
+            ring.r += (ring.maxR - ring.r) * 0.10 + 0.9;
+            const alpha = (1 - t) * 0.68;
+            if (alpha < 0.01 || ring.r >= ring.maxR) {
+                rings.splice(i, 1);
+                continue;
+            }
+            canvasCtx.beginPath();
+            canvasCtx.arc(ring.x, ring.y, ring.r, 0, Math.PI * 2);
+            canvasCtx.strokeStyle = `oklch(78% 0.22 ${ring.h} / ${alpha})`;
+            canvasCtx.lineWidth = 2.1 * (1 - t) + 0.45;
+            canvasCtx.stroke();
+        }
+    }
+
+    function clamp01(v: number): number {
+        return Math.max(0, Math.min(1, v));
+    }
+
+    function primeInstrumentEstimation() {
+        lastInstrumentUpdate = 0;
+        setInstrumentStatus('Estimating instrument mix…', 'ready');
+    }
+
+    function updateInstrumentEstimates(features: Features, now: number) {
+        if (!instrumentResults || now - lastInstrumentUpdate < INSTRUMENT_UPDATE_MS) return;
+        lastInstrumentUpdate = now;
+
+        const estimates = [
+            {
+                label: 'Percussion',
+                score: 0.38 * features.attackTime + 0.25 * features.spectralContrast + 0.22 * features.roughness + 0.15 * features.energy,
+            },
+            {
+                label: 'Bass',
+                score: 0.48 * features.subBass + 0.30 * features.bassRatio + 0.12 * (1 - features.zcr) + 0.10 * features.energy,
+            },
+            {
+                label: 'Guitar',
+                score: 0.36 * features.midRatio + 0.30 * features.harmonicRatio + 0.22 * features.chromaStrength + 0.12 * features.attackTime,
+            },
+            {
+                label: 'Vocals',
+                score: 0.40 * features.midRatio + 0.27 * features.chromaStrength + 0.20 * features.tonnetz + 0.13 * (1 - features.roughness),
+            },
+            {
+                label: 'Piano',
+                score: 0.32 * features.dynamicRange + 0.26 * features.attackTime + 0.24 * features.chromaStrength + 0.18 * features.harmonicRatio,
+            },
+            {
+                label: 'Strings',
+                score: 0.38 * features.harmonicRatio + 0.32 * features.tonnetz + 0.18 * (1 - features.attackTime) + 0.12 * features.midRatio,
+            },
+            {
+                label: 'Brass',
+                score: 0.36 * features.brightness + 0.30 * features.spectralContrast + 0.20 * features.energy + 0.14 * features.rolloff,
+            },
+            {
+                label: 'Synth',
+                score: 0.40 * features.flatness + 0.30 * features.highRatio + 0.20 * features.rolloff + 0.10 * features.tempo,
+            },
+        ].map((entry) => ({ label: entry.label, score: clamp01(entry.score) }));
+
+        const total = estimates.reduce((sum, entry) => sum + entry.score, 0) || 1;
+        const top = estimates
+            .map((entry) => ({ label: entry.label, score: entry.score / total }))
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 5);
+
+        instrumentResults.innerHTML = top.map(({ label, score }) => `
+            <div class="instr-row">
+                <span class="instr-label">${label}</span>
+                <div class="instr-track"><div class="instr-bar" style="width:${(score * 100).toFixed(2)}%"></div></div>
+                <span class="instr-value">${(score * 100).toFixed(1)}%</span>
+            </div>
+        `).join('');
+    }
 
     const canvas          = document.getElementById('colorCanvas') as HTMLCanvasElement;
     const canvasCtx       = canvas.getContext('2d')!;
@@ -568,8 +561,6 @@
     canvasCtx.fillStyle = '#0f0f1a';
     canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
 
-    const layerHistory: LayerFrame[] = [];
-
     let audioContext:     AudioContext | null = null;
     let analyser:         AnalyserNode | null = null;
     let dataArray:        Uint8Array<ArrayBuffer> | null = null;
@@ -579,6 +570,7 @@
     let bufferSource:     AudioBufferSourceNode | null = null;
     let silentGain:       GainNode | null = null;
     let mediaStream:      MediaStream | null = null;
+    let lastVisualFrameTime = 0;
 
     async function ensureAudioContext() {
         if (!audioContext || audioContext.state === 'closed') {
@@ -592,7 +584,8 @@
 
     function setupAnalyser() {
         analyser = audioContext!.createAnalyser();
-        analyser.fftSize = 2048;
+        analyser.fftSize = 1024;
+        analyser.smoothingTimeConstant = 0.78;
         dataArray       = new Uint8Array(analyser.frequencyBinCount);
         timeDomainArray = new Uint8Array(analyser.fftSize);
     }
@@ -600,22 +593,6 @@
     function resetCanvas() {
         canvasCtx.fillStyle = '#0f0f1a';
         canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
-    }
-
-    function resetMetricBars() {
-        for (const { key } of METRICS) {
-            (document.getElementById(`bar-${key}`) as HTMLElement).style.width = '0%';
-            (document.getElementById(`val-${key}`) as HTMLElement).textContent  = '0.00';
-        }
-    }
-
-    function updateMetricBars(features: Record<string, number>) {
-        for (const { key } of METRICS) {
-            const v   = features[key] ?? 0;
-            const pct = Math.min(100, Math.round(v * 100));
-            (document.getElementById(`bar-${key}`) as HTMLElement).style.width = `${pct}%`;
-            (document.getElementById(`val-${key}`) as HTMLElement).textContent  = v.toFixed(2);
-        }
     }
 
     function stopCapture() {
@@ -639,16 +616,15 @@
         micStartBtn.disabled     = false;
         micStopBtn.disabled      = true;
 
-        layerHistory.length = 0;
-        rings.length        = 0;
-        ptcls.length        = 0;
-        shakeAmt            = 0;
+        lastVisualFrameTime = 0;
+        lastInstrumentUpdate = 0;
+        rings.length = 0;
         state.energyHistory.length = 0;
-        pcmCount = 0;
-        pcmPos   = 0;
+        state.pulseLCH.l = 70;
+        state.pulseLCH.c = 0.15;
+        state.pulseLCH.h = 200;
         setInstrumentStatus('—', '');
         resetCanvas();
-        resetMetricBars();
     }
 
     document.querySelectorAll('.tab').forEach(tab => {
@@ -683,6 +659,7 @@
                     bufferSource.onended = () => {
                         if (bufferSource) { bufferSource.disconnect(); bufferSource = null; }
                     };
+                    primeInstrumentEstimation();
                     if (!animationFrameId) drawVisualization();
                 } catch (err) {
                     console.error('Audio decode error:', err);
@@ -715,6 +692,7 @@
             audioTracks[0].onended = stopCapture;
             speakerStartBtn.disabled = true;
             speakerStopBtn.disabled  = false;
+            primeInstrumentEstimation();
             if (!animationFrameId) drawVisualization();
         } catch (err: any) {
             if (err.name !== 'NotAllowedError') {
@@ -744,6 +722,7 @@
             mediaStream.getAudioTracks()[0].onended = stopCapture;
             micStartBtn.disabled = true;
             micStopBtn.disabled  = false;
+            primeInstrumentEstimation();
             if (!animationFrameId) drawVisualization();
         } catch (err: any) {
             if (err.name !== 'NotAllowedError') {
@@ -759,113 +738,25 @@
         if (!analyser || (!bufferSource && !sourceNode)) {
             if (animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
             resetCanvas();
-            resetMetricBars();
             return;
         }
 
         animationFrameId = requestAnimationFrame(drawVisualization);
 
+        const now = performance.now();
+        if (now - lastVisualFrameTime < FRAME_INTERVAL_MS) return;
+        lastVisualFrameTime = now;
+
         analyser.getByteFrequencyData(dataArray!);
         analyser.getByteTimeDomainData(timeDomainArray!);
 
-        // ── Instrument classification ─────────────────────────────────────────
-        appendPCM(downsampleChunk(timeDomainArray!, state.sampleRate));
-        const classifyNow = performance.now();
-        if (classifierReady && !classifying && pcmCount >= PCM_16K_LEN / 2
-                && classifyNow - lastClassifyTime > CLASSIFY_EVERY_MS) {
-            lastClassifyTime = classifyNow;
-            runClassification();
-        }
-
         const features = getAudioFeatures(dataArray!, timeDomainArray!);
+        updateInstrumentEstimates(features, now);
         updateMood(features);
+        drawColorField(features);
+        spawnCenterRing(features);
+        drawWaveformLine(timeDomainArray!, features);
+        drawCenterRings();
 
-        const cx = canvas.width  / 2;
-        const cy = canvas.height / 2;
-        spawnBeatEffects(features, cx, cy);
-
-        const frame = computeLayers(features);
-        layerHistory.push(frame);
-        if (layerHistory.length > NUM_HISTORY) layerHistory.shift();
-
-        // ── Screen shake ──────────────────────────────────────────────────────
-        shakeAmt *= 0.82;
-        const dx = shakeAmt > 0.5 ? (Math.random() - 0.5) * shakeAmt * 2 : 0;
-        const dy = shakeAmt > 0.5 ? (Math.random() - 0.5) * shakeAmt     : 0;
-        canvasCtx.save();
-        canvasCtx.translate(dx, dy);
-
-        // ── Background ────────────────────────────────────────────────────────
-        canvasCtx.fillStyle = '#0f0f1a';
-        canvasCtx.fillRect(-12, -12, canvas.width + 24, canvas.height + 24);
-
-        const n        = layerHistory.length;
-        const barWidth = canvas.width / NUM_HISTORY;
-
-        // ── A. Frequency layers (bass → mid → high, back to front) ────────────
-        for (const [band, heightScale, opacityMax] of [
-            ['bass', 1.2, 0.88],
-            ['mid',  1.0, 0.80],
-            ['high', 0.7, 0.70],
-        ] as [keyof LayerFrame, number, number][]) {
-            for (let i = 0; i < n; i++) {
-                const fr    = layerHistory[i][band];
-                const x     = canvas.width - (n - i) * barWidth;
-                const alpha = Math.min(1, i / (NUM_HISTORY * 0.15)) * opacityMax;
-                const bh    = Math.max(2, Math.pow(fr.e, 0.7) * canvas.height * heightScale);
-                canvasCtx.fillStyle = `oklch(${fr.l}% ${fr.c} ${fr.h} / ${alpha})`;
-                canvasCtx.fillRect(x, (canvas.height - bh) / 2, barWidth + 1, bh);
-            }
-        }
-
-        // ── B. Waveform ───────────────────────────────────────────────────────
-        if (timeDomainArray && features.energy > MIN_THRESHOLD) {
-            canvasCtx.strokeStyle = `oklch(72% 0.14 ${smBand.mid.h} / 0.55)`;
-            canvasCtx.lineWidth   = 1.5;
-            canvasCtx.beginPath();
-            const step = canvas.width / timeDomainArray.length;
-            for (let i = 0; i < timeDomainArray.length; i++) {
-                const v = (timeDomainArray[i] / 128) - 1;
-                const y = cy + v * cy * 0.75;
-                i === 0 ? canvasCtx.moveTo(0, y) : canvasCtx.lineTo(i * step, y);
-            }
-            canvasCtx.stroke();
-        }
-
-        // ── C. Beat rings ─────────────────────────────────────────────────────
-        for (let i = rings.length - 1; i >= 0; i--) {
-            const ring = rings[i];
-            const t    = ring.r / ring.maxR;
-            ring.r    += (ring.maxR - ring.r) * 0.07 + 1.2;
-            const alpha = (1 - t) * 0.72;
-            if (alpha < 0.01 || ring.r >= ring.maxR) { rings.splice(i, 1); continue; }
-            canvasCtx.beginPath();
-            canvasCtx.arc(ring.x, ring.y, ring.r, 0, Math.PI * 2);
-            canvasCtx.strokeStyle = `oklch(68% 0.26 ${ring.h} / ${alpha})`;
-            canvasCtx.lineWidth   = 3 * (1 - t) + 0.5;
-            canvasCtx.stroke();
-        }
-
-        // ── D. Particles ──────────────────────────────────────────────────────
-        for (let i = ptcls.length - 1; i >= 0; i--) {
-            const p = ptcls[i];
-            p.x  += p.vx; p.y  += p.vy;
-            p.vy += 0.06;              // gravity
-            p.vx *= 0.97; p.vy *= 0.97; // drag
-            p.age++;
-            if (p.age >= p.life) { ptcls.splice(i, 1); continue; }
-            const t     = p.age / p.life;
-            const alpha = (1 - t) * 0.9;
-            canvasCtx.beginPath();
-            canvasCtx.arc(p.x, p.y, p.sz * (1 - t * 0.7), 0, Math.PI * 2);
-            canvasCtx.fillStyle = `oklch(75% 0.28 ${p.h} / ${alpha})`;
-            canvasCtx.fill();
-        }
-
-        canvasCtx.restore();
-        const { isBeat: _isBeat, ...numericFeatures } = features;
-        updateMetricBars(numericFeatures);
     }
-
-    initClassifier();
 </script>
