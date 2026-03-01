@@ -15,7 +15,7 @@ export default function ViewPage() {
         <>
             <h1>Audio to Color</h1>
 
-            <div id="mode-tabs" className="mode-tabs">
+            <div id="mode-tabs" className="mode-tabs" enable-xr={true}>
                 <button type="button" className="tab" data-state="active" data-mode="file">File</button>
                 <button type="button" className="tab" data-mode="speaker">Speaker / Tab</button>
                 <button type="button" className="tab" data-mode="microphone">Microphone</button>
@@ -36,12 +36,12 @@ export default function ViewPage() {
                 </div>
             </div>
 
-            <canvas id="colorCanvas" className="color-canvas" width={660} height={280} />
+            <canvas id="colorCanvas" className="color-canvas" width={660} height={280} enable-xr={true} />
 
             <p id="mood" className="mood"></p>
 
             {/* Metric rows are injected dynamically by viewScript.ts */}
-            <div id="metrics" className="metrics"></div>
+            <div id="metrics" className="metrics" enable-xr={true}></div>
 
             <ViewScriptRunner />
         </>
