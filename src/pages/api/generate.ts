@@ -88,7 +88,7 @@ export const POST: APIRoute = async ({ request }) => {
     try {
         const file = new File([new Uint8Array(audio)], filename, { type: 'audio/mpeg' });
         const uploaded = await uploadFile(file);
-        fileKey = uploaded;
+        fileKey = uploaded.data?.key ?? '';
         fileUrl = fileKey ? getFileUrl(fileKey) : undefined;
     } catch (err) {
         console.error('[api/generate] UploadThing error:', err);
