@@ -22,7 +22,7 @@ html {
     font-family: $font-family-base;
     font-size: 16px;
     color: $text-primary;
-    background-color: $bg-primary;
+    background-color: transparent;
 
     // WebSpatial: make the root visionOS window transparent so spatial panels float freely
     --xr-background-material: transparent;
@@ -32,6 +32,7 @@ html {
 
 body {
     overflow-x: hidden;
+    background-color: transparent;
 }
 
 // Typography
