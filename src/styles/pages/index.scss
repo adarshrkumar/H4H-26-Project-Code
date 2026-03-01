@@ -8,7 +8,7 @@
 
 body {
     background-color: #06060f;
-    font-family: system-ui, sans-serif;
+    font-family: $font-family-base;
     color: #e0e0e0;
     min-height: 100vh;
 }
@@ -81,8 +81,8 @@ body {
         letter-spacing: 0.14em;
         text-transform: uppercase;
         color: var(--mood-color);
-        background-color: color-mix(in srgb, var(--mood-color) 12%, transparent);
-        border: 1px solid color-mix(in srgb, var(--mood-color) 35%, transparent);
+        background-color: rgba(17, 17, 42, 0.88);
+        border: 1px solid rgba(17, 17, 42, 0.65);
         border-radius: 999px;
         padding: 4px 14px;
         margin-bottom: 16px;
@@ -128,14 +128,14 @@ body {
 
     &:hover {
         border-color: var(--btn-color, #e94560);
-        background-color: color-mix(in srgb, var(--btn-color, #e94560) 8%, #11112a);
+        background-color: mix(var(--btn-color, #e94560), #11112a, 8%);
         transform: translateY(-3px);
         color: #fff;
     }
 
     &.selected {
         border-color: var(--btn-color, #e94560);
-        background-color: color-mix(in srgb, var(--btn-color, #e94560) 14%, #11112a);
+        background-color: mix(var(--btn-color, #e94560), #11112a, 14%);
         color: #fff;
 
         .mood-btn__emoji { transform: scale(1.25); }
@@ -293,7 +293,7 @@ body {
 
         &[data-state='done'] {
             border-color: var(--mood-color);
-            background-color: color-mix(in srgb, var(--mood-color) 8%, #0b0b1e);
+            background-color: mix(var(--mood-color), #0b0b1e, 8%);
         }
     }
 
@@ -479,15 +479,15 @@ body {
     transition: border-color 0.2s, background-color 0.2s, transform 0.15s;
 
     &:hover {
-        border-color: color-mix(in srgb, var(--mood-color) 60%, #1e1e3a);
-        background-color: color-mix(in srgb, var(--mood-color) 6%, #0f0f24);
+        border-color: mix(var(--mood-color), #1e1e3a, 60%);
+        background-color: mix(var(--mood-color), #0f0f24, 6%);
         transform: translateY(-2px);
         color: #ddd;
     }
 
     &.selected {
         border-color: var(--mood-color);
-        background-color: color-mix(in srgb, var(--mood-color) 12%, #0f0f24);
+        background-color: mix(var(--mood-color), #0f0f24, 12%);
         color: #fff;
 
         .energy-card__icon { transform: scale(1.2); }
@@ -628,7 +628,6 @@ body {
         border: 1.5px solid #1e1e3a;
         border-radius: 10px;
         font-size: 0.88rem;
-        font-family: 'Georgia', serif;
         color: #ccc;
         resize: vertical;
         line-height: 1.75;
@@ -646,14 +645,13 @@ body {
 // ── Chapter card lyrics ───────────────────────────────────────────────────────
 
 .chapter-card__lyrics {
-    font-family: 'Georgia', serif;
     font-size: 0.78rem;
     color: #555;
     line-height: 1.75;
     white-space: pre-line;
     margin: 0;
     padding: 8px 12px;
-    border-left: 2px solid color-mix(in srgb, var(--section-color, var(--mood-color)) 40%, transparent);
+    border-left: 2px solid rgba(128, 128, 128, 0.6);
     transition: color 0.3s;
 
     .chapter-card[data-playing='true'] & {
@@ -797,9 +795,9 @@ body {
     &[data-playing='true'] {
         border-color: var(--section-color, var(--mood-color));
         box-shadow:
-            0 0 0 2px color-mix(in srgb, var(--section-color, var(--mood-color)) 30%, transparent),
-            0 0 60px color-mix(in srgb, var(--section-color, var(--mood-color)) 12%, transparent);
-        background-color: color-mix(in srgb, var(--section-color, var(--mood-color)) 4%, #0e0e20);
+            0 0 0 2px rgba(128, 128, 128, 0.7),
+            0 0 60px rgba(128, 128, 128, 0.88);
+        background-color: mix(var(--section-color, var(--mood-color)), #0e0e20, 4%);
     }
 
     &__header {
