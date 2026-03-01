@@ -523,6 +523,8 @@
     const speakerStopBtn  = document.getElementById('speakerStopBtn') as HTMLButtonElement;
     const micStartBtn     = document.getElementById('micStartBtn') as HTMLButtonElement;
     const micStopBtn      = document.getElementById('micStopBtn') as HTMLButtonElement;
+    const startVisualBtn  = document.getElementById('startVisualizerBtn') as HTMLButtonElement;
+    const stopVisualBtn   = document.getElementById('stopVisualizerBtn') as HTMLButtonElement;
 
     canvasCtx.fillStyle = '#fff';
     canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
@@ -534,7 +536,7 @@
     let dataArray:        Uint8Array | null = null;
     let timeDomainArray:  Uint8Array | null = null;
     let animationFrameId: number | null = null;
-    let sourceNode:       MediaStreamAudioSourceNode | null = null;
+    let sourceNode:       (MediaStreamAudioSourceNode | MediaElementAudioSourceNode) | null = null;
     let bufferSource:     AudioBufferSourceNode | null = null;
     let silentGain:       GainNode | null = null;
     let mediaStream:      MediaStream | null = null;
@@ -665,7 +667,7 @@
             await ensureAudioContext();
             setupAnalyser();
             sourceNode = audioContext!.createMediaStreamSource(mediaStream);
-            sourceNode.connect(analyser!);
+            sourceNode!.connect(analyser!);
             audioTracks[0].onended = stopCapture;
             speakerStartBtn.disabled = true;
             speakerStopBtn.disabled  = false;
@@ -689,7 +691,7 @@
             sourceNode = audioContext!.createMediaStreamSource(mediaStream);
             silentGain = audioContext!.createGain();
             silentGain.gain.value = 0;
-            sourceNode.connect(analyser!);
+            sourceNode!.connect(analyser!);
             analyser!.connect(silentGain);
             silentGain.connect(audioContext!.destination);
             audioContext!.onstatechange = () => {
@@ -708,6 +710,30 @@
     });
 
     micStopBtn.addEventListener('click', stopCapture);
+    startVisualBtn.addEventListener('click', async () => {
+        stopCapture();
+        try {
+            const sourceAudio = document.getElementById('sourceAudio') as HTMLAudioElement;
+            if (!sourceAudio) {
+                alert('Audio element not found');
+                return;
+            }
+            await ensureAudioContext();
+            setupAnalyser();
+            sourceNode = audioContext!.createMediaElementSource(sourceAudio);
+            sourceNode!.connect(analyser!);
+            analyser!.connect(audioContext!.destination);
+            sourceAudio.play();
+            startVisualBtn.disabled = true;
+            stopVisualBtn.disabled = false;
+            if (!animationFrameId) drawVisualization();
+        } catch (err: unknown) {
+            console.error('Audio setup error:', err);
+            alert('Could not start visualization');
+        }
+    });
+
+    stopVisualBtn.addEventListener('click', stopCapture);
 
     function drawVisualization() {
         if (!analyser || (!bufferSource && !sourceNode)) {
