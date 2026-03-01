@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { Music } from '@elevenlabs/elevenlabs-js';
 import { generateCompositionPlan } from './eleven-labs';
 import { uploadFile, getFileUrl } from './uploadthing';
+import { saveTrack } from '@db/helpers';
 
 export interface SectionPrompt {
     sectionName: string;
@@ -147,6 +148,14 @@ export async function generateAndSave(input: GenerateAndSavePayload): Promise<Ge
         fileUrl = fileKey ? getFileUrl(fileKey) : undefined;
     } catch {
         throw new GenerateAndSaveError('Failed to upload audio', 500);
+    }
+
+    // Step 4: persist to Convex
+    try {
+        await saveTrack({ id: fileKey, title: songTitle, artist: input.artist, mimeType: 'audio/mpeg', fileKey, fileUrl });
+    } catch (err) {
+        // Non-fatal: log but don't fail the request
+        console.error('[generate-and-save] Convex insert failed', err);
     }
 
     return {
