@@ -12,9 +12,11 @@
         pulseLCH:      { l: 70, c: 0.15, h: 200 }
     };
 
-    const MIN_THRESHOLD  = 0.01;
-    const NUM_HISTORY    = 200;
-    const ENERGY_HISTORY = 10;
+    const MIN_THRESHOLD       = 0.01;
+    const NUM_HISTORY         = 200;
+    const ENERGY_HISTORY      = 10;
+    const WAVEFORM_MIN_ENERGY = 0.01;
+    const WAVEFORM_LINE_WIDTH = 0.85;
 
     // Waveform spikiness constants
     const SPIKE_BASE_EXP      = 1.15; // High exponent = smaller quiet sounds (tighter)
@@ -442,8 +444,7 @@
 
     type Features = ReturnType<typeof getAudioFeatures>;
 
-    // ── Waveform — scrolling live envelope + tonal color ─────────────────────
-    const waveHistory: { min: number; max: number }[] = [];
+    // ── Waveform — real-time stroke line, tonal color ─────────────────────────
     const waveColor = { l: 60, c: 0.18, h: 200 };
     function updateWaveColor(f: Features) {
         const sm   = 0.02; // very slow — ignores transient beats
@@ -460,6 +461,21 @@
         const wx = Math.cos(waveColor.h * Math.PI / 180) * (1 - sm) + tx * sm;
         const wy = Math.sin(waveColor.h * Math.PI / 180) * (1 - sm) + ty * sm;
         waveColor.h = (Math.atan2(wy, wx) * 180 / Math.PI + 360) % 360;
+    }
+
+    function drawWaveformLine(timeDomain: Uint8Array, features: Features) {
+        if (features.energy < WAVEFORM_MIN_ENERGY) return;
+        const cy   = canvas.height / 2;
+        const step = canvas.width / timeDomain.length;
+        canvasCtx.strokeStyle = `oklch(80% 0.14 ${waveColor.h} / 0.5)`;
+        canvasCtx.lineWidth   = WAVEFORM_LINE_WIDTH;
+        canvasCtx.beginPath();
+        for (let i = 0; i < timeDomain.length; i++) {
+            const v = (timeDomain[i] / 128) - 1;
+            const y = cy + v * cy * 0.62;
+            i === 0 ? canvasCtx.moveTo(0, y) : canvasCtx.lineTo(i * step, y);
+        }
+        canvasCtx.stroke();
     }
 
     // ── A. Layered frequency-color bars ──────────────────────────────────────
@@ -670,7 +686,6 @@
         micStopBtn.disabled      = true;
 
         layerHistory.length  = 0;
-        waveHistory.length   = 0;
         rings.length         = 0;
         ptcls.length        = 0;
         shakeAmt            = 0;
@@ -839,28 +854,8 @@
         const n        = layerHistory.length;
         const barWidth = canvas.width / NUM_HISTORY;
 
-        // ── B. Live scrolling waveform (tonal color, beat-independent) ────────
-        if (timeDomainArray && features.energy >= 0.01) {
-            let mn = 1, mx = -1;
-            for (let i = 0; i < timeDomainArray.length; i++) {
-                const v = (timeDomainArray[i] / 128) - 1;
-                if (v < mn) mn = v;
-                if (v > mx) mx = v;
-            }
-            waveHistory.push({ min: mn, max: mx });
-            if (waveHistory.length > NUM_HISTORY) waveHistory.shift();
-
-            const bw = canvas.width / NUM_HISTORY;
-            for (let i = 0; i < waveHistory.length; i++) {
-                const { min, max } = waveHistory[i];
-                const x     = canvas.width - (waveHistory.length - i) * bw;
-                const yTop  = cy + max * cy * 0.62;
-                const yBot  = cy + min * cy * 0.62;
-                const alpha = Math.min(1, i / (NUM_HISTORY * 0.15)) * 0.85;
-                canvasCtx.fillStyle = `oklch(${waveColor.l}% ${waveColor.c} ${waveColor.h} / ${alpha})`;
-                canvasCtx.fillRect(x, yTop, bw + 1, Math.max(1, yBot - yTop));
-            }
-        }
+        // ── B. Waveform ───────────────────────────────────────────────────────
+        drawWaveformLine(timeDomainArray!, features);
 
         // ── C. Beat rings ─────────────────────────────────────────────────────
         for (let i = rings.length - 1; i >= 0; i--) {
