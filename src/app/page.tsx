@@ -5,6 +5,7 @@
  */
 
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import IndexScriptRunner from '@/components/IndexScriptRunner';
 import config from '@/lib/config';
 import '@/styles/pages/index.scss';
@@ -76,6 +77,7 @@ export default function ComposePage() {
                 <header className="compose-header">
                     <h1 className="compose-header__title">🎵 Compose Your Music</h1>
                     <p className="compose-header__subtitle">Express your rhythm. Shape your feeling. Build your story — your way.</p>
+                    <Link href="/view" className="btn secondary">🎨 Audio Visualizer</Link>
                 </header>
 
                 {/* ── Step 1 · Mood ─────────────────────────────────── */}
