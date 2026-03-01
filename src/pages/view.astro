@@ -32,21 +32,11 @@ import { METRICS } from '@/lib/metrics';
         </div>
     </div>
 
-    <div id="canvas-container" class="canvas-container">
-        <canvas id="colorCanvas" class="color-canvas" width="660" height="340"></canvas>
-    </div>
-
-    {/* instrument-results disabled until model is ready
-    <div id="instrument-results" class="instrument-results">
-        <p class="instrument-status">—</p>
-    </div>
-    */}
-
     <div id="metrics" class="metrics">
         {METRICS.map(({ key, label }) => (
             <div class="metric-row">
                 <span class="metric-label">{label}</span>
-                <canvas class="metric-graph" id={`graph-${key}`} width="200" height="40"></canvas>
+                <canvas class="metric-graph" id={`graph-${key}`} width="600" height="80"></canvas>
                 <span class={`metric-value val-${key}`} id={`val-${key}`}>0.00</span>
             </div>
         ))}
