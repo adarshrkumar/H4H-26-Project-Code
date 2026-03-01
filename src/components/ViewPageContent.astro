@@ -6,7 +6,7 @@ interface Props {
     music?: {
         id: string;
         title: string | null;
-        file?: unknown;
+        file?: { key?: string } | unknown;
         prompt?: string | null;
         artist?: string | null;
         duration?: number | null;
@@ -20,6 +20,15 @@ interface Props {
 }
 
 const { music, audioUrl, errorMessage } = Astro.props;
+
+// Get the file key from music.file and construct the proxy URL
+let proxiedAudioUrl = audioUrl;
+if (music?.file && typeof music.file === 'object' && 'key' in music.file) {
+    const fileKey = (music.file as { key?: string }).key;
+    if (fileKey) {
+        proxiedAudioUrl = `/api/audio?key=${encodeURIComponent(fileKey)}`;
+    }
+}
 ---
 
 <div class="view-page-content">
@@ -59,7 +68,7 @@ const { music, audioUrl, errorMessage } = Astro.props;
             <div class="player">
                 <h2>{music.title}</h2>
                 <audio id="sourceAudio" class="player__audio" controls>
-                    <source src={audioUrl} type="audio/mpeg" />
+                    <source src={proxiedAudioUrl} type="audio/mpeg" />
                     Your browser does not support the audio element.
                 </audio>
             </div>

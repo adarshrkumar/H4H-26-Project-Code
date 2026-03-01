@@ -87,7 +87,7 @@ export const POST: APIRoute = async ({ request }) => {
 
     try {
         const uploadFilename = `${songTitle.replace(/[^a-z0-9_-]/gi, '_')}.mp3`;
-        const file = new File([new Uint8Array(audio)], uploadFilename, { type: 'audio/mpeg' });
+        const file = new File([Buffer.from(audio)], uploadFilename, { type: 'audio/mpeg' });
         const uploaded = await uploadFile(file);
 
         if (uploaded.error !== null) {

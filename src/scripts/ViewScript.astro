@@ -721,6 +721,10 @@
             }
             
             console.log('Audio element found, src:', sourceAudio.src);
+            console.log('Audio readyState:', sourceAudio.readyState, 'networkState:', sourceAudio.networkState);
+            
+            // Reset audio to start
+            sourceAudio.currentTime = 0;
             
             await ensureAudioContext();
             setupAnalyser();
@@ -729,7 +733,28 @@
             sourceNode!.connect(analyser!);
             analyser!.connect(audioContext!.destination);
             
-            console.log('Audio context setup complete, attempting to play...');
+            console.log('Audio context setup complete, attempting to load and play...');
+            
+            // Wait for audio to be loadable
+            if (sourceAudio.readyState < 2) {
+                console.log('Waiting for audio to load...');
+                await new Promise<void>((resolve, reject) => {
+                    const onCanPlay = () => {
+                        sourceAudio.removeEventListener('canplay', onCanPlay);
+                        sourceAudio.removeEventListener('error', onError);
+                        resolve();
+                    };
+                    const onError = () => {
+                        sourceAudio.removeEventListener('canplay', onCanPlay);
+                        sourceAudio.removeEventListener('error', onError);
+                        reject(new Error('Failed to load audio: ' + (sourceAudio.error?.message || 'Unknown error')));
+                    };
+                    sourceAudio.addEventListener('canplay', onCanPlay);
+                    sourceAudio.addEventListener('error', onError);
+                    sourceAudio.load();
+                    setTimeout(() => reject(new Error('Audio load timeout')), 10000);
+                });
+            }
             
             try {
                 await sourceAudio.play();
