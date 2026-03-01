@@ -435,7 +435,7 @@ export function initViewScript(): () => void {
 
     function stopCapture() {
         if (bufferSource) {
-            try { bufferSource.stop(); } catch (_) {}
+            try { bufferSource.stop(); } catch {}
             bufferSource.disconnect();
             bufferSource = null;
         }
