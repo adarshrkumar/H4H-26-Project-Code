@@ -2,7 +2,7 @@
   "name": "Huephonic Spatial",
   "short_name": "Huephonic",
   "description": "Spatial Audio-to-Color view",
-  "start_url": "/view?xr=1",
+  "start_url": "/?xr=1",
   "scope": "/",
   "display": "standalone",
   "background_color": "#000000",
