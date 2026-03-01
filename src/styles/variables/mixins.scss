@@ -236,3 +236,125 @@
         -webkit-overflow-scrolling: touch;
     }
 }
+
+// ────────────────────────────────────────────────────────────────
+// UTILITY CLASSES
+// ────────────────────────────────────────────────────────────────
+
+.container {
+    @include container;
+}
+
+.flex-center {
+    @include flex-center;
+}
+
+.flex-between {
+    @include flex-between;
+}
+
+.flex-column {
+    @include flex-column;
+}
+
+.card {
+    @include card;
+}
+
+.sr-only {
+    @include visually-hidden;
+}
+
+// Spacing utilities
+.mt-small {
+    margin-top: $spacing-small;
+}
+
+.mt-medium {
+    margin-top: $spacing-medium;
+}
+
+.mt-large {
+    margin-top: $spacing-large;
+}
+
+.mt-extra-large {
+    margin-top: $spacing-extra-large;
+}
+
+.mb-small {
+    margin-bottom: $spacing-small;
+}
+
+.mb-medium {
+    margin-bottom: $spacing-medium;
+}
+
+.mb-large {
+    margin-bottom: $spacing-large;
+}
+
+.mb-extra-large {
+    margin-bottom: $spacing-extra-large;
+}
+
+.pt-small {
+    padding-top: $spacing-small;
+}
+
+.pt-medium {
+    padding-top: $spacing-medium;
+}
+
+.pt-large {
+    padding-top: $spacing-large;
+}
+
+.pt-extra-large {
+    padding-top: $spacing-extra-large;
+}
+
+.pb-small {
+    padding-bottom: $spacing-small;
+}
+
+.pb-medium {
+    padding-bottom: $spacing-medium;
+}
+
+.pb-large {
+    padding-bottom: $spacing-large;
+}
+
+.pb-extra-large {
+    padding-bottom: $spacing-extra-large;
+}
+
+// Text utilities
+.text-center {
+    text-align: center;
+}
+
+.text-primary {
+    color: $text-primary;
+}
+
+.text-secondary {
+    color: $text-secondary;
+}
+
+.text-light {
+    color: $text-light;
+}
+
+.truncate {
+    @include truncate;
+}
+
+.line-clamp-2 {
+    @include line-clamp(2);
+}
+
+.line-clamp-3 {
+    @include line-clamp(3);
+}
