@@ -2,10 +2,16 @@ import type { NextConfig } from 'next';
 import path from 'path';
 import withWebSpatial from '@webspatial/next-plugin';
 
+const isSpatialBuild = process.env.SPATIAL_BUILD === '1';
+
 const nextConfig: NextConfig = {
     // Pin the workspace root to this project so Next.js doesn't get confused
     // by parent-directory lockfiles in a monorepo-like folder structure.
     outputFileTracingRoot: path.join(__dirname),
+
+    // Static export only for spatial builds (webspatial-builder expects dist/).
+    // Vercel uses the default .next server build.
+    ...(isSpatialBuild && { output: 'export', distDir: 'dist' }),
 
     // Replicates Astro's additionalData injection so every SCSS file
     // automatically has SCSS variables and mixins available.
