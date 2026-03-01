@@ -1,0 +1,4 @@
+[submodule "gen-music-ref"]
+	path = gen-music-ref
+	url = https://github.com/adarshrkumar/H4H-26-Project-Code.git
+	branch = Gen-Music
