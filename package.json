@@ -27,6 +27,7 @@
     "dependencies": {
         "@astrojs/check": "^0.9.6",
         "@astrojs/vercel": "^9.0.2",
+        "@elevenlabs/elevenlabs-js": "^2.37.0",
         "@huggingface/transformers": "^3.8.1",
         "ai": "^5.0.0",
         "astro": "^5.16.6",
@@ -41,6 +42,7 @@
         "sass": "^1.82.0",
         "turndown": "^7.2.0",
         "typescript": "^5.7.2",
+        "uploadthing": "^7.7.4",
         "zod": "^3.24.1"
     },
     "devDependencies": {

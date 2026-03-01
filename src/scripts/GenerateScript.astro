@@ -1,0 +1,285 @@
+<script>
+    // ── Constants ──────────────────────────────────────────────────────────────
+
+    const SECTION_IDS = ['intro', 'verse1', 'chorus', 'verse2', 'bridge', 'outro'] as const;
+    type SectionId = typeof SECTION_IDS[number];
+
+    const SECTION_LABELS: Record<SectionId, string> = {
+        intro: 'Intro', verse1: 'Verse 1', chorus: 'Chorus',
+        verse2: 'Verse 2', bridge: 'Bridge', outro: 'Outro',
+    };
+
+    // Explicit structural role injected into the combined prompt.
+    const SECTION_MUSICAL_ROLE: Record<SectionId, string> = {
+        intro:  'INTRO/OPENING: establish the mood and musical theme gradually, build anticipation, do NOT reach full chorus energy yet — hint at what is coming',
+        verse1: 'VERSE 1: melodic foundation, moderate and steady energy, storytelling feel, build tension toward the chorus',
+        chorus: 'CHORUS/REFRAIN: the emotional and musical PEAK of the song, full energy release, strong memorable hook, this must be the most impactful part',
+        verse2: 'VERSE 2: similar structure to verse 1 but slightly more developed and intense, building back toward the chorus',
+        bridge: 'BRIDGE: contrasting section, different feel from verses and chorus, create musical tension and surprise before the final chorus',
+        outro:  'OUTRO/ENDING: bring the song to a natural close, resolve musical tension, wind down or fade — do NOT introduce new high-energy peaks',
+    };
+
+    // Pre-written lyrics per energy pattern × section.
+    const LYRICS_BY_ENERGY: Record<string, Record<SectionId, string>> = {
+        rise: {
+            intro:  'Something stirs in the silence\nA feeling starts to rise\nThe story opens slowly\nOpening tired eyes',
+            verse1: "I've been standing at this edge\nFeeling it begin to grow\nSlowly finding footing\nLearning as I go",
+            chorus: 'Rising through the noise\nRising through the fall\nThis is the moment building\nWaiting for the call',
+            verse2: 'Deeper still it rises\nGathering its strength\nPushing through the layers\nGoing to great lengths',
+            bridge: 'Before the final breaking\nEverything holds still\nThe tension keeps on climbing\nPushing past the thrill',
+            outro:  'Slowly coming down now\nThe feeling starts to ease\nEverything we built up\nReleased into the breeze',
+        },
+        explode: {
+            intro:  "Can't contain what's coming\nSomething's about to break\nEvery wall around me\nShaking in its wake",
+            verse1: 'Running through the fire\nNothing holds me back\nAll the words come pouring\nOff the beaten track',
+            chorus: 'Break it all wide open\nLet the chaos fly\nThis is the explosion\nWatch the sparks defy',
+            verse2: "Nothing can contain it\nSecond wave hits hard\nPushing through the limits\nEvery single shard",
+            bridge: 'Silence before the shockwave\nEverything goes still\nThen the world erupts again\nWith impossible will',
+            outro:  'After all the thunder\nAfter all the fire\nWhat remains is silence\nAnd something even higher',
+        },
+        minimal: {
+            intro:  'Just a note, just a breath\nJust the bare bones of a feeling\nStripped of all the extra\nJust the truth revealing',
+            verse1: 'Less is more than enough\nIn the space between the words\nSomething speaks more clearly\nThan anything you heard',
+            chorus: 'Simple and exact\nEvery word counts\nNothing more is needed\nThan what love amounts',
+            verse2: 'Back to what is real\nBack to quiet truth\nStripped back to the layers\nLike the days of youth',
+            bridge: 'In the stillness now\nEverything is clear\nNothing left to hide behind\nEverything right here',
+            outro:  'One last quiet note\nOne last moment held\nEverything was simple\nEverything was felt',
+        },
+        steady: {
+            intro:  'Beat by beat it enters\nPulse by pulse it grows\nSteady as the heartbeat\nEveryone already knows',
+            verse1: 'One foot then the other\nOne step at a time\nThe rhythm holds me steady\nFalling into rhyme',
+            chorus: 'Steady in the storm\nSteady through the night\nPulse the center constant\nKeeping rhythm right',
+            verse2: 'Still the beat continues\nConsistent all the way\nSomething you can count on\nEvery single day',
+            bridge: 'Even in the tension\nThe pulse does not break\nSteady through the shifting\nFor everyone\'s sake',
+            outro:  'The beat slows gently\nBut never fully stops\nThe rhythm lives inside you\nLong after it drops',
+        },
+        chaos: {
+            intro:  'Everything is spinning\nNothing stays in place\nWelcome to the madness\nRunning this dark race',
+            verse1: 'Words come out in fragments\nThoughts break into pieces\nIn the beautiful disorder\nEverything releases',
+            chorus: 'Chaos is the answer\nWild is the way\nEverything unpredictable\nNone of it okay',
+            verse2: 'Deeper in the spiral\nFaster through the blur\nEverything is happening\nNothing as it were',
+            bridge: 'In the eye of chaos\nFor one second still\nThen the storm comes back\nWith a violent thrill',
+            outro:  'After all the chaos\nComes a kind of peace\nAll the broken pieces\nCome to a release',
+        },
+        smooth: {
+            intro:  'Like water finding its way\nLike a river to the sea\nEverything flows gently\nSmooth as it can be',
+            verse1: 'Moving without friction\nGliding through the air\nEvery word a current\nCarrying me there',
+            chorus: 'Smooth and unbroken\nFlowing to the end\nEverything connected\nEvery single bend',
+            verse2: 'Still the river carries\nStill the current flows\nDeeper now and smoother\nOnly the river knows',
+            bridge: 'A pause in the flowing\nA moment without motion\nThen the wave continues\nAcross the endless ocean',
+            outro:  'The stream slows to a whisper\nThe river meets the sea\nEverything flows back now\nBack to what is meant to be',
+        },
+    };
+
+    function getLyricsSuggestion(sectionId: SectionId, energyPattern: string): string {
+        return LYRICS_BY_ENERGY[energyPattern]?.[sectionId]
+            ?? LYRICS_BY_ENERGY['smooth']?.[sectionId]
+            ?? '';
+    }
+
+    // ── State ──────────────────────────────────────────────────────────────────
+
+    let selectedMood = '';
+    let selectedMoodColor = '#e94560';
+
+    // ── CSS variable helpers ───────────────────────────────────────────────────
+
+    function setMoodColor(color: string) {
+        document.documentElement.style.setProperty('--mood-color', color);
+    }
+
+    // ── Mood: hover shifts atmosphere, click locks it in ──────────────────────
+
+    document.querySelectorAll<HTMLButtonElement>('.mood-btn').forEach(btn => {
+        const color = btn.dataset.color ?? '#e94560';
+
+        btn.addEventListener('mouseenter', () => setMoodColor(color));
+        btn.addEventListener('mouseleave', () => setMoodColor(selectedMoodColor));
+
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.mood-btn').forEach(b => {
+                b.classList.remove('selected');
+                b.setAttribute('aria-pressed', 'false');
+            });
+            btn.classList.add('selected');
+            btn.setAttribute('aria-pressed', 'true');
+            selectedMood = btn.dataset.mood ?? '';
+            selectedMoodColor = color;
+            setMoodColor(color);
+        });
+    });
+
+    // ── Energy cards: single-select per section ────────────────────────────────
+
+    document.querySelectorAll<HTMLButtonElement>('.energy-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const sectionId = card.dataset.section as SectionId;
+            // Deselect all others in this section
+            document.querySelectorAll<HTMLButtonElement>(`.energy-card[data-section="${sectionId}"]`).forEach(c => {
+                c.classList.remove('selected');
+                c.setAttribute('aria-pressed', 'false');
+            });
+            // Toggle (click again to deselect)
+            const isNowSelected = !card.classList.contains('selected');
+            if (isNowSelected) {
+                card.classList.add('selected');
+                card.setAttribute('aria-pressed', 'true');
+
+                // Auto-fill lyrics if the textarea is still empty
+                const lyricsEl = document.getElementById(`lyrics-${sectionId}`) as HTMLTextAreaElement | null;
+                if (lyricsEl && !lyricsEl.value.trim()) {
+                    lyricsEl.value = getLyricsSuggestion(sectionId, card.dataset.pattern ?? 'smooth');
+                }
+
+                // Mark section as configured in the map and status
+                updateMapSegment(sectionId);
+                const statusEl = document.getElementById(`status-${sectionId}`);
+                if (statusEl) setStatus(statusEl, 'done', '✓ Configured');
+            } else {
+                // If deselected and no custom text/lyrics, reset status
+                const customText = (document.getElementById(`text-${sectionId}`) as HTMLTextAreaElement | null)?.value.trim();
+                const lyrics     = (document.getElementById(`lyrics-${sectionId}`) as HTMLTextAreaElement | null)?.value.trim();
+                if (!customText && !lyrics) {
+                    const statusEl = document.getElementById(`status-${sectionId}`);
+                    if (statusEl) setStatus(statusEl, 'idle', '○ Not yet shaped');
+                    const seg = document.getElementById(`map-${sectionId}`);
+                    if (seg) delete seg.dataset.state;
+                }
+            }
+        });
+    });
+
+    // "Refresh lyrics" button — always re-generates based on current energy selection
+    SECTION_IDS.forEach(id => {
+        document.getElementById(`lyrics-suggest-${id}`)?.addEventListener('click', () => {
+            const lyricsEl = document.getElementById(`lyrics-${id}`) as HTMLTextAreaElement | null;
+            if (!lyricsEl) return;
+            const selected = document.querySelector<HTMLButtonElement>(`.energy-card[data-section="${id}"].selected`);
+            lyricsEl.value = getLyricsSuggestion(id, selected?.dataset.pattern ?? 'smooth');
+        });
+    });
+
+    // ── Combined prompt builder ────────────────────────────────────────────────
+
+    function buildCombinedPrompt(): string {
+        const concept = (document.getElementById('song-concept') as HTMLInputElement | null)?.value.trim();
+        const style   = (document.getElementById('song-style')   as HTMLInputElement | null)?.value.trim();
+
+        const parts: string[] = [];
+
+        // Song-wide identity — locks in key, tempo, genre for the whole track
+        const identity: string[] = [];
+        if (selectedMood) identity.push(selectedMood);
+        if (style)        identity.push(style);
+        if (concept)      identity.push(`song theme: ${concept}`);
+        identity.push('consistent musical key, BPM, timbre, and instrumentation throughout the entire song');
+        parts.push(identity.join(', '));
+
+        // Full structure overview
+        const structure = SECTION_IDS.map(id => SECTION_LABELS[id]).join(' → ');
+        parts.push(`compose a complete song with this structure: ${structure}`);
+
+        // Per-section details
+        for (const id of SECTION_IDS) {
+            const selectedEnergy = document.querySelector<HTMLButtonElement>(
+                `.energy-card[data-section="${id}"].selected`
+            );
+            const energyValue = selectedEnergy?.dataset.value ?? '';
+            const customText  = (document.getElementById(`text-${id}`) as HTMLTextAreaElement | null)?.value.trim() ?? '';
+            const lyrics      = (document.getElementById(`lyrics-${id}`) as HTMLTextAreaElement | null)?.value.trim() ?? '';
+
+            const sectionParts: string[] = [SECTION_MUSICAL_ROLE[id]];
+            if (energyValue) sectionParts.push(energyValue);
+            if (customText)  sectionParts.push(customText);
+            if (lyrics)      sectionParts.push(`vocals/lyrics: "${lyrics}"`);
+
+            parts.push(`[${SECTION_LABELS[id]}] ${sectionParts.join(', ')}`);
+        }
+
+        return parts.join('. ');
+    }
+
+    // ── Generate Full Song ─────────────────────────────────────────────────────
+
+    document.getElementById('generate-song-btn')?.addEventListener('click', generateFullSong);
+
+    async function generateFullSong() {
+        const btn      = document.getElementById('generate-song-btn') as HTMLButtonElement | null;
+        const resultEl = document.getElementById('combine-result') as HTMLElement | null;
+        if (!btn || !resultEl) return;
+
+        const prompt = buildCombinedPrompt();
+
+        btn.disabled = true;
+        btn.textContent = '⟳ Composing your full song…';
+        resultEl.innerHTML = '';
+        resultEl.hidden = false;
+
+        try {
+            const res = await fetch('/api/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    text: prompt,
+                    title: 'Full Song',
+                    musicLengthMs: 240000,
+                }),
+            });
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({})) as Record<string, unknown>;
+                const message = typeof err.error === 'string' ? err.error : 'Generation failed.';
+                const suggestion = typeof err.suggestion === 'string' ? err.suggestion : undefined;
+                resultEl.innerHTML = `
+                    <div class="section-result error">
+                        <p class="section-result__error-msg">⚠️ ${message}</p>
+                        ${suggestion ? `<p class="section-result__suggestion-text">💡 ${suggestion}</p>` : ''}
+                    </div>
+                `;
+                btn.textContent = '✨ Try Again';
+                btn.disabled = false;
+                return;
+            }
+
+            const data = await res.json() as {
+                id: string;
+                title: string;
+                file?: { key: string; url?: string };
+            };
+
+            const audioUrl = data.file?.url ?? '';
+            if (!audioUrl) throw new Error('No audio URL returned from the server.');
+
+            resultEl.innerHTML = `
+                <div class="section-result">
+                    <p class="section-result__label">Your complete song is ready — press play:</p>
+                    <audio class="section-result__audio" controls src="${audioUrl}" preload="metadata"></audio>
+                    <a class="btn secondary small section-result__download"
+                       href="${audioUrl}" download="full-song.mp3">
+                        ⬇ Download Full Song
+                    </a>
+                </div>
+            `;
+
+            btn.textContent = '✨ Regenerate Full Song';
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Something went wrong.';
+            resultEl.innerHTML = `<div class="section-result error"><p class="section-result__error-msg">⚠️ ${message}</p></div>`;
+            btn.textContent = '✨ Try Again';
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────────────
+
+    function setStatus(el: HTMLElement, state: 'idle' | 'loading' | 'done' | 'error', text: string) {
+        el.dataset.state = state;
+        el.textContent = text;
+    }
+
+    function updateMapSegment(sectionId: SectionId) {
+        const seg = document.getElementById(`map-${sectionId}`);
+        if (seg) seg.dataset.state = 'done';
+    }
+</script>
