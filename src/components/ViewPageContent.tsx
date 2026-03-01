@@ -10,11 +10,48 @@ import ViewSpatialSpheres from '@/components/ViewSpatialSpheres';
 import '@/styles/pages/view.scss';
 import { useEffect, useState } from 'react';
 
+interface SongFile { fileKey: string; fileUrl: string; }
+interface Song { id: string; title: string | null; artist: string | null; files: SongFile[]; }
+
+function getIdFromHash(): string | null {
+    const hash = window.location.hash;
+    const q = hash.indexOf('?');
+    if (q === -1) return null;
+    return new URLSearchParams(hash.slice(q + 1)).get('id');
+}
+
+function loadUrlIntoVisualizer(url: string) {
+    // Fetch the audio as a blob then trigger the file input change so
+    // viewScript's existing file-handler picks it up.
+    fetch(url)
+        .then(r => r.blob())
+        .then(blob => {
+            const input = document.getElementById('vizFileInput') as HTMLInputElement | null;
+            if (!input) return;
+            const file = new File([blob], 'track.mp3', { type: blob.type || 'audio/mpeg' });
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            input.files = dt.files;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+        })
+        .catch(() => {/* silently ignore */});
+}
+
 export default function ViewPageContent() {
     const [hasUserInteracted, setHasUserInteracted] = useState(false);
+    const [song, setSong] = useState<Song | null>(null);
     const isXrTransparentView =
         typeof window !== 'undefined' &&
         new URLSearchParams(window.location.search).get('xr') === '1';
+
+    useEffect(() => {
+        const id = getIdFromHash();
+        if (!id) return;
+        fetch(`/api/track/${encodeURIComponent(id)}`)
+            .then(r => r.ok ? r.json() : null)
+            .then((data: Song | null) => { if (data) setSong(data); })
+            .catch(() => {/* ignore */});
+    }, []);
 
     useEffect(() => {
         const bodyClass = 'view-xr-transparent';
@@ -90,6 +127,23 @@ export default function ViewPageContent() {
                             <button type="button" className="viz-btn viz-btn--ghost" id="vizResetBtn">Reset</button>
                         </div>
                     </header>
+
+                    {/* ── DB track banner (when id is in URL) ─────────────── */}
+                    {song && (
+                        <div className="viz-track-banner">
+                            <span className="viz-track-banner__title">{song.title ?? 'Untitled'}</span>
+                            {song.files.map((f, i) => (
+                                <button
+                                    key={f.fileKey}
+                                    type="button"
+                                    className="viz-btn"
+                                    onClick={() => loadUrlIntoVisualizer(f.fileUrl)}
+                                >
+                                    ▶ Part {i + 1}
+                                </button>
+                            ))}
+                        </div>
+                    )}
 
                     {/* ── Main ────────────────────────────────────────────── */}
                     <main className="viz-main">
