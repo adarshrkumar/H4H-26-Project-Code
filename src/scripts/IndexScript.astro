@@ -22,7 +22,7 @@
     const SPIKE_SCALE         = 1.40; // Vertical scale multiplier
 
     // ── Instrument Classification ─────────────────────────────────────────────
-    const INSTRUMENT_MODEL  = 'onnx-community/Musical-Instrument-Classification-ONNX';
+    const INSTRUMENT_MODEL  = 'adarshrkumar/musical-instrument-detection-onnx';
     const CLASSIFY_EVERY_MS = 3000;  // run inference at most every 3 s
     const PCM_16K_LEN       = 48000; // 3 s at 16 kHz
 
@@ -80,7 +80,7 @@
         setInstrumentStatus('Loading instrument model…', 'loading');
         try {
             const { pipeline } = await import('@huggingface/transformers');
-            classifierPipeline = await pipeline('audio-classification', INSTRUMENT_MODEL, { dtype: 'q8' });
+            classifierPipeline = await pipeline('audio-classification', INSTRUMENT_MODEL, { dtype: 'fp32' });
             classifierReady    = true;
             setInstrumentStatus('Model ready — listening…', 'ready');
         } catch (err) {
