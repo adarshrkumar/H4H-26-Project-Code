@@ -14,8 +14,10 @@
     "format": "biome format ."
   },
   "dependencies": {
+    "@ai-sdk/openai": "^3.0.37",
     "@elevenlabs/elevenlabs-js": "^2.37.0",
     "@neondatabase/serverless": "^1.0.0",
+    "ai": "^6.0.105",
     "astro": "^5.16.6",
     "cheerio": "^1.0.0",
     "dotenv": "^17.3.1",
