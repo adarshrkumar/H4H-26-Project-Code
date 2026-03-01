@@ -2,47 +2,193 @@
 import Layout from '@/layouts/Layout.astro';
 import '@/styles/pages/view.scss';
 import ViewScript from '../scripts/ViewScript.astro';
-import { METRICS } from '@/lib/metrics';
+
+const moods = [
+    { id: 'calm',       label: 'Calm',      icon: '🌊', hue: 210 },
+    { id: 'intense',    label: 'Intense',   icon: '🔥', hue: 15  },
+    { id: 'mysterious', label: 'Mystery',   icon: '🌙', hue: 280 },
+    { id: 'bright',     label: 'Bright',    icon: '☀️', hue: 55  },
+    { id: 'dreamy',     label: 'Dreamy',    icon: '🌌', hue: 270 },
+    { id: 'energetic',  label: 'Energetic', icon: '⚡', hue: 145 },
+];
+
+const layers = [
+    { id: 'ground', name: 'Ground Energy', freq: '20–200 Hz',  icon: '🌋' },
+    { id: 'flow',   name: 'Flow Energy',   freq: '200–800 Hz', icon: '🌊' },
+    { id: 'form',   name: 'Form Energy',   freq: '800–3 kHz',  icon: '🔷' },
+    { id: 'spark',  name: 'Spark Energy',  freq: '3–8 kHz',    icon: '✨' },
+    { id: 'air',    name: 'Air Texture',   freq: '8–20 kHz',   icon: '💨' },
+];
 ---
 
-<Layout pageTitle="Home">
-    <div class="page-header">
-        <h1>Audio to Color</h1>
-        <h4>An orchestra for the deaf!</h4>
-    </div>
+<Layout pageTitle="Visual Story">
+    <div class="viz-page">
 
-    <div id="mode-tabs" class="mode-tabs">
-        <button class="tab" data-state="active" data-mode="file">File</button>
-        <button class="tab" data-mode="speaker">Speaker / Tab</button>
-        <button class="tab" data-mode="microphone">Microphone</button>
-    </div>
+        <!-- Zone 1: Top Bar -->
+        <header class="viz-topbar">
+            <h1 class="viz-topbar__title">Visual Music Story</h1>
 
-    <div id="controls" class="controls">
-        <div id="ctrl-file" class="ctrl-panel" data-state="active">
-            <label for="audioFile">Audio file</label>
-            <input type="file" id="audioFile" accept="audio/*" />
-        </div>
-        <div id="ctrl-speaker" class="ctrl-panel">
-            <button type="button" class="btn" id="speakerStartBtn">Start Capture</button>
-            <button type="button" class="btn stop" id="speakerStopBtn" disabled>Stop</button>
-        </div>
-        <div id="ctrl-microphone" class="ctrl-panel">
-            <button type="button" class="btn" id="micStartBtn">Start Microphone</button>
-            <button type="button" class="btn stop" id="micStopBtn" disabled>Stop</button>
-        </div>
-    </div>
+            <nav class="viz-moods" aria-label="Override mood color">
+                {moods.map(m => (
+                    <button
+                        class="viz-mood-btn"
+                        type="button"
+                        data-mood={m.id}
+                        data-hue={m.hue}
+                        aria-pressed="false"
+                    >
+                        <span class="viz-mood-btn__icon">{m.icon}</span>
+                        <span class="viz-mood-btn__label">{m.label}</span>
+                    </button>
+                ))}
+            </nav>
 
-    <div id="metrics" class="metrics">
-        {METRICS.map(({ key, label, color }) => (
-            <div class="metric-panel">
-                <div class="metric-panel__header">
-                    <span class="metric-label" style={`color: ${color}`}>{label}</span>
-                    <span class={`metric-value val-${key}`} id={`val-${key}`}>0.00</span>
+            <div class="viz-input-bar">
+                <div class="viz-tabs" role="tablist" aria-label="Audio source">
+                    <button class="viz-tab" data-state="active" data-mode="file" role="tab" type="button" aria-selected="true">File</button>
+                    <button class="viz-tab" data-mode="speaker" role="tab" type="button" aria-selected="false">Speaker / Tab</button>
+                    <button class="viz-tab" data-mode="mic" role="tab" type="button" aria-selected="false">Microphone</button>
                 </div>
-                <canvas class="metric-graph" id={`graph-${key}`} width="400" height="80"></canvas>
+                <div class="viz-input-panels">
+                    <div class="viz-input-panel" id="panel-file" data-state="active">
+                        <input type="file" id="vizFileInput" accept="audio/*" />
+                    </div>
+                    <div class="viz-input-panel" id="panel-speaker">
+                        <button id="speakerStartBtn" type="button" class="viz-btn">Share Tab Audio</button>
+                        <button id="speakerStopBtn" type="button" class="viz-btn viz-btn--ghost" disabled>Stop</button>
+                    </div>
+                    <div class="viz-input-panel" id="panel-mic">
+                        <button id="micStartBtn" type="button" class="viz-btn">Use Microphone</button>
+                        <button id="micStopBtn" type="button" class="viz-btn viz-btn--ghost" disabled>Stop</button>
+                    </div>
+                </div>
             </div>
-        ))}
-    </div>
 
-    <ViewScript />
+            <div class="viz-playback">
+                <button id="vizPauseBtn" class="viz-btn" type="button" disabled>Pause</button>
+                <button id="vizResetBtn" class="viz-btn viz-btn--ghost" type="button">Reset</button>
+            </div>
+        </header>
+
+        <!-- Zone 2: Main -->
+        <main class="viz-main">
+
+            <!-- Left: Frequency Layer Toggles -->
+            <aside class="viz-panel viz-panel--left" aria-label="Energy layers">
+                <h2 class="viz-panel__title">Energy Layers</h2>
+                <p class="viz-panel__hint">Toggle each layer to show or hide its frequency band in the visualization.</p>
+                {layers.map(l => (
+                    <div class="viz-layer" id={`layer-wrap-${l.id}`} data-active="true">
+                        <input
+                            type="checkbox"
+                            class="viz-layer__toggle"
+                            id={`toggle-${l.id}`}
+                            data-layer={l.id}
+                            checked
+                        />
+                        <label for={`toggle-${l.id}`}>
+                            <span class="viz-layer__icon">{l.icon}</span>
+                            <div class="viz-layer__text">
+                                <span class="viz-layer__name">{l.name}</span>
+                                <span class="viz-layer__freq">{l.freq}</span>
+                            </div>
+                            <div class="viz-layer__preview" aria-hidden="true">
+                                {[0,1,2,3,4].map(i => <span style={`--i:${i}`}></span>)}
+                            </div>
+                        </label>
+                    </div>
+                ))}
+            </aside>
+
+            <!-- Center: Canvas -->
+            <div class="viz-canvas-wrap">
+                <canvas id="viz-canvas"></canvas>
+                <div id="viz-am-hidden" aria-hidden="true"></div>
+                <div class="viz-overlay" id="vizOverlay" data-state="idle">
+                    <p class="viz-overlay__text">Choose a source above to begin</p>
+                </div>
+                <!-- Brief instruction overlay shown when audio starts -->
+                <div class="viz-hint" id="vizHint">
+                    <p><strong>Circle size</strong> = loudness &nbsp;·&nbsp; <strong>Circle edge</strong> = smooth (bass) or jagged (treble)</p>
+                    <p><strong>Bottom dots</strong> = rhythm pattern &nbsp;·&nbsp; <strong>Left bars</strong> = frequency energy</p>
+                </div>
+            </div>
+
+            <!-- Right: Visual Options -->
+            <aside class="viz-panel viz-panel--right" aria-label="Visual options">
+                <div class="viz-panel__header">
+                    <h2 class="viz-panel__title">Visual Options</h2>
+                    <button id="vizHelpBtn" class="viz-help-btn" type="button"
+                            aria-expanded="false" aria-controls="vizHelpDrop"
+                            title="What do these controls do?">?</button>
+                </div>
+
+                <!-- Help dropdown — toggled by the ? button -->
+                <div class="viz-help-drop" id="vizHelpDrop">
+                    <div class="viz-help-section">
+                        <p class="viz-help-heading">Toggles</p>
+                        <dl class="viz-help-list">
+                            <dt>Spark Ring</dt>
+                            <dd>Iridescent rings burst outward from the center circle on every detected beat.</dd>
+                            <dt>High Contrast</dt>
+                            <dd>Boosts brightness of all colors — good for bright rooms or low-vision users.</dd>
+                            <dt>Colorblind Mode</dt>
+                            <dd>Shifts all colors to a deuteranopia-safe blue / orange / purple palette.</dd>
+                            <dt>Reduce Motion</dt>
+                            <dd>Freezes wave animations, beat flashes, and expanding rings. Beat grid and bars still react.</dd>
+                            <dt>Smooth Mode</dt>
+                            <dd>Slows beat detection — fewer triggers, better for calm or ambient music.</dd>
+                        </dl>
+                    </div>
+                    <div class="viz-help-section">
+                        <p class="viz-help-heading">Canvas elements</p>
+                        <dl class="viz-help-list">
+                            <dt>Center Circle</dt>
+                            <dd>Size = overall loudness. Jagged edge = treble energy. Smooth edge = bass-heavy or quiet.</dd>
+                            <dt>Freq Bars (left)</dt>
+                            <dd>BASS at bottom (felt in floor/chest) → AIR at top (high pitch). Bar length = energy in that range. The bright mark = recent peak.</dd>
+                            <dt>Beat Grid (bottom dots)</dt>
+                            <dd>16 slots grouped in 4s. A glowing dot means a beat fired in that time window — watch the rhythm pattern build.</dd>
+                        </dl>
+                    </div>
+                    <div class="viz-help-section">
+                        <p class="viz-help-heading">Energy Layers (left panel)</p>
+                        <dl class="viz-help-list">
+                            <dt>Unchecking a layer</dt>
+                            <dd>Removes that frequency band from the circle, bars, and beat detection entirely.</dd>
+                        </dl>
+                    </div>
+                </div>
+
+                <label class="viz-opt-toggle">
+                    <input type="checkbox" class="viz-switch" id="sparkRingToggle" checked />
+                    <span>Spark Ring</span>
+                </label>
+                <label class="viz-opt-toggle">
+                    <input type="checkbox" class="viz-switch" id="highContrast" />
+                    <span>High Contrast</span>
+                </label>
+                <label class="viz-opt-toggle">
+                    <input type="checkbox" class="viz-switch" id="colorblindMode" />
+                    <span>Colorblind Mode</span>
+                </label>
+                <label class="viz-opt-toggle">
+                    <input type="checkbox" class="viz-switch" id="reduceMotion" />
+                    <span>Reduce Motion</span>
+                </label>
+                <label class="viz-opt-toggle">
+                    <input type="checkbox" class="viz-switch" id="smoothMode" />
+                    <span>Smooth Mode</span>
+                </label>
+
+                <div class="viz-pulse-wrap">
+                    <span class="viz-panel__title">Beat Pulse</span>
+                    <div class="viz-pulse-preview" id="vizPulsePreview" aria-hidden="true"></div>
+                </div>
+            </aside>
+
+        </main>
+    </div>
 </Layout>
+
+<ViewScript />
