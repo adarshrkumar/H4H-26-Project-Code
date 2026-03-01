@@ -14,7 +14,7 @@
     "format": "biome format ."
   },
   "dependencies": {
-    "@neondatabase/serverless": "^0.11.0",
+    "@neondatabase/serverless": "^1.0.0",
     "astro": "^5.16.6",
     "cheerio": "^1.0.0",
     "dotenv": "^17.3.1",
