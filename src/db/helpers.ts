@@ -1,24 +1,29 @@
-import { convex } from './initialize';
-import { api } from '../../convex/_generated/api';
-import type { Id } from '../../convex/_generated/dataModel';
+import { db } from './initialize';
+import { music } from './schema';
+import { eq } from 'drizzle-orm';
+import type { CreateMusicInput, UpdateMusicInput } from './validations';
 
-export async function createRecording(prompt: string) {
-    return await convex.mutation(api.music.createMusic, { prompt });
+export async function createRecording(data: CreateMusicInput) {
+    return await db.insert(music).values(data).returning();
 }
 
 export async function updateRecording(
-    id: Id<'music'>,
-    fields: {
-        title?: string;
-        fileKey?: string;
-        fileUrl?: string;
-    }
+    id: string,
+    fields: Partial<CreateMusicInput>
 ) {
-    return await convex.mutation(api.music.updateMusic, {
-        id,
-        title: fields.title,
-        file: fields.fileKey && fields.fileUrl
-            ? { key: fields.fileKey, url: fields.fileUrl }
-            : undefined,
+    return await db
+        .update(music)
+        .set({ ...fields, updatedAt: new Date() })
+        .where(eq(music.id, id))
+        .returning();
+}
+
+export async function getRecording(id: string) {
+    return await db.query.music.findFirst({
+        where: eq(music.id, id),
     });
+}
+
+export async function deleteRecording(id: string) {
+    return await db.delete(music).where(eq(music.id, id)).returning();
 }

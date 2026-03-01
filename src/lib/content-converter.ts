@@ -10,7 +10,6 @@ import TurndownService from 'turndown';
 marked.setOptions({
     gfm: true, // GitHub Flavored Markdown
     breaks: true, // Convert \n to <br>
-    headerIds: true, // Add IDs to headings
     mangle: false, // Don't escape email addresses
 });
 
