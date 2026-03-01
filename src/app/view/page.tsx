@@ -1,11 +1,9 @@
 /**
- * Audio-to-Color page — converted from src/pages/view.astro.
- * Server Component: renders the metric panels and canvas grid.
- * ViewScriptRunner (client component) runs the Web Audio pipeline after hydration.
+ * Audio-to-Color page — ported from Gen-Music branch view.astro.
+ * Server Component: renders the shell. ViewScriptRunner hydrates the audio engine.
  */
 
 import type { Metadata } from 'next';
-import { METRICS } from '@/lib/metrics';
 import ViewScriptRunner from '@/components/ViewScriptRunner';
 import config from '@/lib/config';
 import '@/styles/pages/view.scss';
@@ -15,10 +13,7 @@ export const metadata: Metadata = { title: config.name };
 export default function ViewPage() {
     return (
         <>
-            <div className="page-header">
-                <h1>Huephonic</h1>
-                <h4>An orchestra for the deaf!</h4>
-            </div>
+            <h1>Audio to Color</h1>
 
             <div id="mode-tabs" className="mode-tabs">
                 <button className="tab" data-state="active" data-mode="file">File</button>
@@ -41,19 +36,13 @@ export default function ViewPage() {
                 </div>
             </div>
 
-            <div id="metrics" className="metrics">
-                {METRICS.map(({ key, label, color }) => (
-                    <div key={key} className="metric-panel">
-                        <div className="metric-panel__header">
-                            <span className="metric-label" style={{ '--metric-color': color } as React.CSSProperties}>{label}</span>
-                            <span className={`metric-value val-${key}`} id={`val-${key}`}>0.00</span>
-                        </div>
-                        <canvas className="metric-graph" id={`graph-${key}`} width={400} height={80} />
-                    </div>
-                ))}
-            </div>
+            <canvas id="colorCanvas" className="color-canvas" width={660} height={280} />
 
-            {/* Client-side Web Audio pipeline */}
+            <p id="mood" className="mood"></p>
+
+            {/* Metric rows are injected dynamically by viewScript.ts */}
+            <div id="metrics" className="metrics"></div>
+
             <ViewScriptRunner />
         </>
     );

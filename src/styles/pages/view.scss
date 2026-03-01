@@ -242,3 +242,24 @@ h1 {
     text-align: right;
 }
 
+// ── Spatial overrides (WebSpatial App Shell only) ──────────────────────────────
+
+html.is-spatial {
+    background-color: transparent;
+
+    --xr-background-material: transparent;
+
+    .metric-panel {
+        --xr-background-material: translucent;
+
+        border-radius: 16px;
+        position: relative;
+
+        --xr-back: 20;
+    }
+
+    .mode-tabs {
+        --xr-background-material: thick;
+    }
+}
+

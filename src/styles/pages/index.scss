@@ -935,3 +935,26 @@ body {
     55%  { box-shadow: 0 0 0 22px rgb(74 222 128 / 0%);   }
     100% { box-shadow: 0 0 0 0   rgb(74 222 128 / 0%);    }
 }
+
+// ── Spatial overrides (WebSpatial App Shell only) ──────────────────────────────
+
+html.is-spatial {
+    background-color: transparent;
+
+    --xr-background-material: transparent;
+
+    .compose-page {
+        --xr-background-material: translucent;
+
+        border-radius: 24px;
+        position: relative;
+    }
+
+    .mood-btn {
+        --xr-background-material: thick;
+
+        position: relative;
+
+        --xr-back: 10;
+    }
+}

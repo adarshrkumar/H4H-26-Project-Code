@@ -7,7 +7,7 @@
       "DOM.Iterable"
     ],
     "jsx": "preserve",
-    "jsxImportSource": "react",
+    "jsxImportSource": "@webspatial/react-sdk",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,

@@ -13,7 +13,9 @@
         "test:chrome": "npx playwright test --headed --browser=chromium",
         "test:firefox": "npx playwright test --headed --browser=firefox",
         "test:safari": "npx playwright test --headed --browser=webkit",
-        "test": "npm run test:chrome && npm run test:firefox && npm run test:safari"
+        "test": "npm run test:chrome && npm run test:firefox && npm run test:safari",
+        "spatial:dev": "webspatial-builder dev",
+        "spatial:build": "webspatial-builder build"
     },
     "dependencies": {
         "@ai-sdk/anthropic": "^2.0.67",
@@ -21,6 +23,8 @@
         "@elevenlabs/elevenlabs-js": "^2.37.0",
         "@huggingface/transformers": "^3.8.1",
         "@neondatabase/serverless": "^0.10.4",
+        "@webspatial/core-sdk": "^1.2.0",
+        "@webspatial/react-sdk": "^1.2.0",
         "ai": "^5.0.0",
         "better-auth": "^1.5.0",
         "cheerio": "^1.0.0",
@@ -45,6 +49,9 @@
         "@types/react": "^19.0.0",
         "@types/react-dom": "^19.0.0",
         "@types/turndown": "^5.0.5",
+        "@webspatial/builder": "^1.2.0",
+        "@webspatial/next-plugin": "^0.1.10",
+        "@webspatial/platform-visionos": "^1.2.0",
         "drizzle-kit": "^0.31.9",
         "eslint": "^9.0.0",
         "eslint-config-next": "^15.1.0",

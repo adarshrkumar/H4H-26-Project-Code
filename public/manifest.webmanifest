@@ -1,6 +1,6 @@
 {
-  "name": "Audio to Color",
-  "short_name": "AudioColor",
+  "name": "Huephonic",
+  "short_name": "Huephonic",
   "description": "Real-time audio analysis and mood-driven color visualization",
   "start_url": "/",
   "display": "standalone",

@@ -1,5 +1,6 @@
 import type { NextConfig } from 'next';
 import path from 'path';
+import withWebSpatial from '@webspatial/next-plugin';
 
 const nextConfig: NextConfig = {
     // Pin the workspace root to this project so Next.js doesn't get confused
@@ -14,4 +15,4 @@ const nextConfig: NextConfig = {
     },
 };
 
-export default nextConfig;
+export default withWebSpatial()(nextConfig);
