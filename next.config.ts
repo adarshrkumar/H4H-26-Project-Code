@@ -2,6 +2,10 @@ import type { NextConfig } from 'next';
 import path from 'path';
 
 const nextConfig: NextConfig = {
+    // Pin the workspace root to this project so Next.js doesn't get confused
+    // by parent-directory lockfiles in a monorepo-like folder structure.
+    outputFileTracingRoot: path.join(__dirname),
+
     // Replicates Astro's additionalData injection so every SCSS file
     // automatically has SCSS variables and mixins available.
     sassOptions: {
