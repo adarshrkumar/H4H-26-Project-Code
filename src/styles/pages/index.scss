@@ -356,7 +356,7 @@ body {
         --border-color: #9b59b6;
     }
     &[data-section='outro']  {
-        border-left-color: #1abc9c;
+        --border-color: #1abc9c;
     }
 
     &.just-done {
