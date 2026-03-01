@@ -328,12 +328,12 @@ body {
     background-color: #0b0b1e;
     overflow: hidden;
 
-    &[data-section='intro']  { $accent-color: #4a90e2; }
-    &[data-section='verse1'] { $accent-color: #27ae60; }
-    &[data-section='chorus'] { $accent-color: #e94560; }
-    &[data-section='verse2'] { $accent-color: #f39c12; }
-    &[data-section='bridge'] { $accent-color: #9b59b6; }
-    &[data-section='outro']  { $accent-color: #1abc9c; }
+    &[data-section='intro']  { --accent-color: #4a90e2; }
+    &[data-section='verse1'] { --accent-color: #27ae60; }
+    &[data-section='chorus'] { --accent-color: #e94560; }
+    &[data-section='verse2'] { --accent-color: #f39c12; }
+    &[data-section='bridge'] { --accent-color: #9b59b6; }
+    &[data-section='outro']  { --accent-color: #1abc9c; }
 
     &::after {
         content: '';
@@ -343,7 +343,7 @@ body {
         bottom: 0;
         width: $border-size;
         height: 100%;
-        background-color: $accent-color;
+        background-color: var(--accent-color);
     }
 
     &.just-done {
