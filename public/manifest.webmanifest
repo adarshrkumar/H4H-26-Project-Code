@@ -2,7 +2,7 @@
   "name": "Huephonic",
   "short_name": "Huephonic",
   "description": "Real-time audio analysis and mood-driven color visualization",
-  "start_url": "./",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#4f46e5",
