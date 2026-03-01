@@ -23,6 +23,7 @@
     "drizzle-orm": "^0.45.1",
     "effect": "^3.0.0",
     "marked": "^12.0.0",
+    "open-props": "^1.7.23",
     "turndown": "^7.1.3",
     "uploadthing": "^7.7.4",
     "vite-plugin-pwa": "^0.20.0",
