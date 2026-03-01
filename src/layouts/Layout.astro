@@ -30,7 +30,7 @@ const shouldSkipFirst =
 
 const newPageTitle = (pageArray && pageArray.length > 0 && firstElement)
     ? shouldSkipFirst
-        ? pageArray.filter((a, i) => i !== 0)
+        ? pageArray.filter((_, i) => i !== 0)
         : pageArray
     : null;
 
