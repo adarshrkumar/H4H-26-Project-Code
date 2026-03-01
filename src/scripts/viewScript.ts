@@ -6,20 +6,20 @@
  * Returns a cleanup function that stops the audio pipeline.
  */
 
+import AudioMotionAnalyzer from 'audiomotion-analyzer';
 import { METRICS } from '@/lib/metrics';
 
 export function initViewScript(): () => void {
+    // ── Audio-feature state ───────────────────────────────────────────────────
+
     const state = {
         prevSpectrum:  null as Uint8Array<ArrayBuffer> | null,
-        prevEnergy:    0,
-        onsetTimes:    [] as number[],
-        energyHistory: [] as number[],
+        onsetTimes:    []   as number[],
+        energyHistory: []   as number[],
         energyEMA:     0,
         sampleRate:    44100,
     };
 
-    const MIN_THRESHOLD  = 0.01;
-    const NUM_HISTORY    = 100;
     const ENERGY_HISTORY = 10;
 
     function getAudioFeatures(dataArray: Uint8Array<ArrayBuffer>, timeDomainArray?: Uint8Array<ArrayBuffer>) {
@@ -65,11 +65,18 @@ export function initViewScript(): () => void {
         state.prevSpectrum = new Uint8Array(dataArray);
 
         // ── onset / tempo ────────────────────────────────────────────────────
-        const now   = performance.now();
-        const delta = energy - state.prevEnergy;
-        if (delta > 0.12 && energy > 0.15) state.onsetTimes.push(now);
-        state.prevEnergy = energy;
-        const cutoff = now - 3000;
+        const now = performance.now();
+        state.energyEMA = state.energyEMA * 0.88 + energy * 0.12;
+        let isBeat = false;
+        if (
+            energy > state.energyEMA * 1.25 &&
+            energy > 0.03 &&
+            (state.onsetTimes.length === 0 || now - state.onsetTimes[state.onsetTimes.length - 1] > 200)
+        ) {
+            state.onsetTimes.push(now);
+            isBeat = true;
+        }
+        const cutoff = now - 6000;
         while (state.onsetTimes.length > 0 && state.onsetTimes[0] < cutoff)
             state.onsetTimes.shift();
         let tempo = 0;
@@ -84,15 +91,12 @@ export function initViewScript(): () => void {
         // ── flatness ─────────────────────────────────────────────────────────
         let flatness = 0;
         if (totalAmplitude > 0) {
-            let logSum = 0, nonZero = 0;
-            for (let i = 1; i < N; i++) {
-                if (dataArray[i] > 0) { logSum += Math.log(dataArray[i]); nonZero++; }
-            }
-            if (nonZero > 0) {
-                const geoMean   = Math.exp(logSum / nonZero);
-                const arithMean = totalAmplitude / N;
-                flatness = Math.min(1, arithMean > 0 ? geoMean / arithMean : 0);
-            }
+            const n = N - 1;
+            let logSum = 0;
+            for (let i = 1; i < N; i++) logSum += Math.log(dataArray[i] + 1);
+            const geoMean   = Math.exp(logSum / n);
+            const arithMean = (totalAmplitude + n) / n;
+            flatness = Math.min(1, geoMean / arithMean);
         }
 
         // ── bassRatio (bottom 10% of bins) ───────────────────────────────────
@@ -120,7 +124,10 @@ export function initViewScript(): () => void {
             const threshold = totalAmplitude * 0.85;
             for (let i = 0; i < N; i++) {
                 cumulative += dataArray[i];
-                if (cumulative >= threshold) { rolloff = i / N; break; }
+                if (cumulative >= threshold) {
+                    rolloff = i / N;
+                    break;
+                }
             }
         }
 
@@ -128,8 +135,7 @@ export function initViewScript(): () => void {
         const subBassEnd = hz2bin(80);
         let subBassSum = 0;
         for (let i = 1; i <= subBassEnd; i++) subBassSum += dataArray[i];
-        const subBass = totalAmplitude > 0
-            ? Math.min(1, (subBassSum / subBassEnd) / (totalAmplitude / N)) : 0;
+        const subBass = totalAmplitude > 0 ? Math.min(1, subBassSum / totalAmplitude) : 0;
 
         // ── midRatio (250 Hz – 4 kHz) ────────────────────────────────────────
         const midStart = hz2bin(250), midEnd = hz2bin(4000);
@@ -201,7 +207,10 @@ export function initViewScript(): () => void {
             const searchEnd = Math.floor(N * 0.25);
             let fundBin = 1, fundEnergy = 0;
             for (let i = 2; i < searchEnd; i++) {
-                if (dataArray[i] > fundEnergy) { fundEnergy = dataArray[i]; fundBin = i; }
+                if (dataArray[i] > fundEnergy) {
+                    fundEnergy = dataArray[i];
+                    fundBin = i;
+                }
             }
             if (fundEnergy > 10) {
                 let harmEnergy = 0;
@@ -231,7 +240,10 @@ export function initViewScript(): () => void {
         const chromaTotal = chroma.reduce((s, v) => s + v, 0);
         let chromaMax = 0, chromaMaxIdx = 0;
         for (let i = 0; i < 12; i++) {
-            if (chroma[i] > chromaMax) { chromaMax = chroma[i]; chromaMaxIdx = i; }
+            if (chroma[i] > chromaMax) {
+                chromaMax = chroma[i];
+                chromaMaxIdx = i;
+            }
         }
         const chromaMean     = chromaTotal / 12;
         const chromaStrength = chromaMean > 0 ? Math.min(1, (chromaMax / chromaMean) / 4) : 0;
@@ -244,7 +256,10 @@ export function initViewScript(): () => void {
             const pitchMaxBin = hz2bin(2000);
             let peakBin = pitchMinBin, peakVal = 0;
             for (let i = pitchMinBin; i <= pitchMaxBin; i++) {
-                if (dataArray[i] > peakVal) { peakVal = dataArray[i]; peakBin = i; }
+                if (dataArray[i] > peakVal) {
+                    peakVal = dataArray[i];
+                    peakBin = i;
+                }
             }
             if (peakVal > 20) {
                 const hz = peakBin * sr / fftSz;
@@ -307,7 +322,7 @@ export function initViewScript(): () => void {
             let raw = 0;
             for (let i = 0; i < numFilters; i++)
                 raw += melFilters[i] * Math.cos(Math.PI * (i + 0.5) / numFilters);
-            mfcc1 = Math.min(1, Math.max(0, (raw + 10) / 20));
+            mfcc1 = Math.min(1, Math.max(0, (raw + 50) / 100));
         }
 
         // ── tonnetz (fifth-related tonal coherence from chroma) ───────────────
@@ -330,317 +345,653 @@ export function initViewScript(): () => void {
             chromaStrength, dominantPitch,
             pitch, attackTime, beatRegularity,
             roughness, mfcc1, tonnetz,
+            isBeat,
         };
     }
 
-    type Features = ReturnType<typeof getAudioFeatures>;
+    // ── Metrics ───────────────────────────────────────────────────────────────
 
-    // ── Mood engine (from Gen-Music ViewScript.astro) ─────────────────────────
-
-    function getMood(f: Features): string {
-        if (f.energy < MIN_THRESHOLD) return 'silent';
-
-        // Base: energy × brightness
-        let mood: string;
-        if (f.energy < 0.35) {
-            mood = f.brightness < 0.38 ? 'melancholic' : f.brightness < 0.65 ? 'peaceful' : 'serene';
-        } else if (f.energy < 0.60) {
-            mood = f.brightness < 0.38 ? 'tense' : f.brightness < 0.65 ? 'focused' : 'uplifting';
-        } else {
-            mood = f.brightness < 0.38 ? 'angry' : f.brightness < 0.65 ? 'powerful' : 'excited';
-        }
-
-        // Volume extremes
-        if (f.energy > 0.80) {
-            const m: Record<string, string> = { peaceful: 'uplifting', serene: 'excited', focused: 'powerful', uplifting: 'excited', melancholic: 'tense', tranquil: 'peaceful', meditative: 'serene', hopeful: 'uplifting', somber: 'melancholic', contemplative: 'focused', brooding: 'tense', heavy: 'powerful', giddy: 'excited' };
-            mood = m[mood] ?? mood;
-        } else if (f.energy < 0.22) {
-            const m: Record<string, string> = { angry: 'tense', powerful: 'focused', excited: 'uplifting', furious: 'angry', intense: 'powerful', frantic: 'tense', driven: 'focused', restless: 'melancholic', joyful: 'peaceful', playful: 'peaceful', euphoric: 'serene' };
-            mood = m[mood] ?? mood;
-        }
-
-        // Tempo
-        if (f.tempo > 0.65) {
-            const m: Record<string, string> = { melancholic: 'restless', peaceful: 'playful', serene: 'joyful', tense: 'frantic', focused: 'driven', uplifting: 'euphoric', angry: 'furious', powerful: 'intense', excited: 'euphoric' };
-            mood = m[mood] ?? mood;
-        } else if (f.tempo > 0 && f.tempo < 0.25) {
-            const m: Record<string, string> = { melancholic: 'somber', peaceful: 'tranquil', serene: 'meditative', tense: 'brooding', focused: 'contemplative', uplifting: 'hopeful', angry: 'smoldering', powerful: 'heavy', excited: 'giddy' };
-            mood = m[mood] ?? mood;
-        }
-
-        // Flux / drone
-        if (f.flux < 0.05 && f.energy > 0.12) {
-            const m: Record<string, string> = { melancholic: 'somber', peaceful: 'meditative', serene: 'meditative', tense: 'brooding', focused: 'contemplative', uplifting: 'hopeful', angry: 'smoldering', powerful: 'heavy', excited: 'giddy', restless: 'brooding', frantic: 'tense', driven: 'focused', euphoric: 'serene', furious: 'angry', intense: 'powerful' };
-            mood = m[mood] ?? mood;
-        }
-
-        // Spectral spread
-        if (f.spread > 0.55 && f.energy > 0.40) {
-            const m: Record<string, string> = { focused: 'powerful', tense: 'frantic', uplifting: 'excited', peaceful: 'uplifting', melancholic: 'tense', contemplative: 'focused', tranquil: 'peaceful' };
-            mood = m[mood] ?? mood;
-        }
-
-        // Bass-heavy
-        if (f.bassRatio > 0.30 && f.energy > 0.25) {
-            const m: Record<string, string> = { uplifting: 'focused', excited: 'powerful', joyful: 'driven', playful: 'restless', hopeful: 'contemplative', giddy: 'restless', euphoric: 'intense', serene: 'peaceful', tranquil: 'somber' };
-            mood = m[mood] ?? mood;
-        }
-
-        // Noisy (flatness + zcr)
-        if (f.flatness > 0.70 && f.zcr > 0.15 && f.energy > 0.15) {
-            const m: Record<string, string> = { peaceful: 'restless', serene: 'uplifting', tranquil: 'peaceful', meditative: 'contemplative', somber: 'brooding', hopeful: 'focused', contemplative: 'tense' };
-            mood = m[mood] ?? mood;
-        }
-
-        // Percussive / transient
-        if (f.crestFactor > 0.65 && f.attackTime > 0.50) {
-            const m: Record<string, string> = { peaceful: 'playful', serene: 'joyful', melancholic: 'restless', focused: 'driven', tense: 'frantic', uplifting: 'euphoric', contemplative: 'focused', somber: 'brooding' };
-            mood = m[mood] ?? mood;
-        }
-
-        // Rough / dissonant
-        if (f.roughness > 0.60 && f.energy > 0.20) {
-            const m: Record<string, string> = { peaceful: 'tense', serene: 'tense', melancholic: 'brooding', focused: 'tense', uplifting: 'excited', tranquil: 'melancholic', hopeful: 'contemplative', meditative: 'somber', joyful: 'restless', playful: 'restless' };
-            mood = m[mood] ?? mood;
-        }
-
-        // Strong harmonic content → tonal/melodic
-        if (f.harmonicRatio > 0.35 && f.roughness < 0.30) {
-            const m: Record<string, string> = { tense: 'focused', angry: 'powerful', frantic: 'driven', restless: 'peaceful', brooding: 'melancholic', smoldering: 'tense', heavy: 'powerful' };
-            mood = m[mood] ?? mood;
-        }
-
-        // Groovy: regular beat + fast tempo
-        if (f.beatRegularity > 0.75 && f.tempo > 0.55) {
-            const m: Record<string, string> = { focused: 'driven', uplifting: 'euphoric', powerful: 'intense', excited: 'euphoric', peaceful: 'playful', joyful: 'euphoric', driven: 'euphoric' };
-            mood = m[mood] ?? mood;
-        }
-
-        // Sub-bass heavy → heavy/deep
-        if (f.subBass > 0.25 && f.energy > 0.30) {
-            const m: Record<string, string> = { uplifting: 'powerful', excited: 'intense', joyful: 'driven', peaceful: 'focused', hopeful: 'contemplative', playful: 'restless', euphoric: 'intense' };
-            mood = m[mood] ?? mood;
-        }
-
-        // High-frequency dominant → airy/bright
-        if (f.highRatio > 0.20 && f.energy > 0.15) {
-            const m: Record<string, string> = { melancholic: 'serene', somber: 'contemplative', brooding: 'focused', heavy: 'tense', smoldering: 'brooding', tranquil: 'serene', meditative: 'serene' };
-            mood = m[mood] ?? mood;
-        }
-
-        // Strong tonal coherence (tonnetz) → resolved/consonant
-        if (f.tonnetz > 0.60 && f.harmonicRatio > 0.20) {
-            const m: Record<string, string> = { tense: 'focused', angry: 'tense', frantic: 'restless', brooding: 'melancholic', heavy: 'powerful' };
-            mood = m[mood] ?? mood;
-        }
-
-        return mood;
-    }
-
-    const MOOD_PALETTE: Record<string, { hue: number; chroma: number; baseL: number }> = {
-        silent:        { hue: 0,   chroma: 0,    baseL: 93 },
-        melancholic:   { hue: 248, chroma: 0.12, baseL: 28 },
-        peaceful:      { hue: 205, chroma: 0.11, baseL: 50 },
-        serene:        { hue: 175, chroma: 0.13, baseL: 58 },
-        tense:         { hue: 22,  chroma: 0.18, baseL: 36 },
-        focused:       { hue: 128, chroma: 0.10, baseL: 38 },
-        uplifting:     { hue: 72,  chroma: 0.18, baseL: 52 },
-        angry:         { hue: 348, chroma: 0.21, baseL: 40 },
-        powerful:      { hue: 25,  chroma: 0.22, baseL: 44 },
-        excited:       { hue: 48,  chroma: 0.25, baseL: 56 },
-        restless:      { hue: 35,  chroma: 0.20, baseL: 45 },
-        playful:       { hue: 80,  chroma: 0.22, baseL: 58 },
-        joyful:        { hue: 55,  chroma: 0.24, baseL: 62 },
-        frantic:       { hue: 10,  chroma: 0.24, baseL: 42 },
-        driven:        { hue: 150, chroma: 0.15, baseL: 42 },
-        euphoric:      { hue: 300, chroma: 0.24, baseL: 58 },
-        furious:       { hue: 0,   chroma: 0.28, baseL: 30 },
-        intense:       { hue: 20,  chroma: 0.26, baseL: 38 },
-        somber:        { hue: 230, chroma: 0.13, baseL: 20 },
-        tranquil:      { hue: 200, chroma: 0.08, baseL: 65 },
-        meditative:    { hue: 185, chroma: 0.09, baseL: 45 },
-        brooding:      { hue: 270, chroma: 0.11, baseL: 25 },
-        contemplative: { hue: 250, chroma: 0.09, baseL: 40 },
-        hopeful:       { hue: 45,  chroma: 0.15, baseL: 55 },
-        smoldering:    { hue: 10,  chroma: 0.16, baseL: 25 },
-        heavy:         { hue: 30,  chroma: 0.14, baseL: 28 },
-        giddy:         { hue: 320, chroma: 0.19, baseL: 60 },
-    };
-
-    function moodToColor(mood: string, energy: number): { color: string; l: number; c: number; h: number } {
-        const base = MOOD_PALETTE[mood] ?? MOOD_PALETTE['focused'];
-        const l    = Math.min(85, Math.max(10, base.baseL + (energy - 0.5) * 30));
-        return { color: `oklch(${Math.round(l)}% ${base.chroma} ${base.hue})`, l, c: base.chroma, h: base.hue };
-    }
-
-    // ── Build bar-based metrics panel ─────────────────────────────────────────
-
-    const metricsPanel = document.getElementById('metrics');
-    if (metricsPanel) {
-        for (const { key, label } of METRICS) {
-            metricsPanel.insertAdjacentHTML('beforeend', `
-                <div class="metric-row">
-                    <span class="metric-label">${label}</span>
-                    <div class="metric-track">
-                        <div class="metric-bar bar-${key}" id="bar-${key}" style="background-color: var(--bar-color-${key})"></div>
-                    </div>
-                    <span class="metric-value val-${key}" id="val-${key}">0.00</span>
-                </div>
-            `);
-        }
-    }
-
-    // ── Canvas and mood display ───────────────────────────────────────────────
-
-    const canvas      = document.getElementById('colorCanvas') as HTMLCanvasElement | null;
-    const canvasCtx   = canvas?.getContext('2d') ?? null;
-    const moodDisplay = document.getElementById('mood');
-
-    if (canvasCtx && canvas) {
-        canvasCtx.fillStyle = '#fff';
-        canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
-    }
-
-    const lchHistory: { l: number; c: number; h: number }[] = [];
-
-    // ── Audio setup ───────────────────────────────────────────────────────────
-
-    const audioFileInput  = document.getElementById('audioFile') as HTMLInputElement | null;
-    const speakerStartBtn = document.getElementById('speakerStartBtn') as HTMLButtonElement | null;
-    const speakerStopBtn  = document.getElementById('speakerStopBtn') as HTMLButtonElement | null;
-    const micStartBtn     = document.getElementById('micStartBtn') as HTMLButtonElement | null;
-    const micStopBtn      = document.getElementById('micStopBtn') as HTMLButtonElement | null;
-
-    let audioContext:     AudioContext | null = null;
-    let analyser:         AnalyserNode | null = null;
-    let dataArray:        Uint8Array<ArrayBuffer> | null = null;
-    let timeDomainArray:  Uint8Array<ArrayBuffer> | null = null;
-    let animationFrameId: number | null = null;
-    let sourceNode:       MediaStreamAudioSourceNode | null = null;
-    let bufferSource:     AudioBufferSourceNode | null = null;
-    let silentGain:       GainNode | null = null;
-    let mediaStream:      MediaStream | null = null;
-
-    async function ensureAudioContext() {
-        if (!audioContext || audioContext.state === 'closed') {
-            audioContext = new AudioContext();
-            state.sampleRate = audioContext.sampleRate;
-        }
-        if (audioContext.state === 'suspended') {
-            await audioContext.resume();
-        }
-    }
-
-    function setupAnalyser() {
-        analyser = audioContext!.createAnalyser();
-        analyser.fftSize = 2048;
-        dataArray       = new Uint8Array(analyser.frequencyBinCount);
-        timeDomainArray = new Uint8Array(analyser.fftSize);
-    }
-
-    function resetCanvas() {
-        if (canvasCtx && canvas) {
-            canvasCtx.fillStyle = '#fff';
-            canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
-        }
+    const HISTORY_LEN = 80;
+    type MetricKey = typeof METRICS[number]['key'];
+    const metricHistory = {} as Record<MetricKey, number[]>;
+    const metricCtx     = {} as Record<MetricKey, CanvasRenderingContext2D>;
+    const metricValEls  = {} as Record<MetricKey, HTMLElement>;
+    for (const { key } of METRICS) {
+        metricHistory[key] = [];
+        const mc = document.getElementById(`graph-${key}`) as HTMLCanvasElement | null;
+        if (mc) metricCtx[key] = mc.getContext('2d')!;
+        const valEl = document.getElementById(`val-${key}`);
+        if (valEl) metricValEls[key] = valEl;
     }
 
     function resetMetricBars() {
         for (const { key } of METRICS) {
-            const bar = document.getElementById(`bar-${key}`);
-            const val = document.getElementById(`val-${key}`);
-            if (bar) bar.style.width = '0%';
-            if (val) val.textContent = '0.00';
+            metricHistory[key] = [];
+            const mctx = metricCtx[key];
+            if (mctx) mctx.clearRect(0, 0, mctx.canvas.width, mctx.canvas.height);
+            if (metricValEls[key]) metricValEls[key].textContent = '0.00';
         }
     }
 
     function updateMetricBars(features: Record<string, number>) {
-        for (const { key } of METRICS) {
-            const v   = features[key] ?? 0;
-            const pct = Math.min(100, Math.round(v * 100));
-            const bar = document.getElementById(`bar-${key}`);
-            const val = document.getElementById(`val-${key}`);
-            if (bar) bar.style.width = `${pct}%`;
-            if (val) val.textContent = v.toFixed(2);
+        for (const { key, color } of METRICS) {
+            const v    = features[key] ?? 0;
+            const hist = metricHistory[key];
+            hist.push(v);
+            if (hist.length > HISTORY_LEN) hist.shift();
+
+            const ctx = metricCtx[key];
+            if (!ctx) continue;
+            const W   = ctx.canvas.width;
+            const H   = ctx.canvas.height;
+
+            ctx.fillStyle = '#12121f';
+            ctx.fillRect(0, 0, W, H);
+
+            if (hist.length >= 2) {
+                const pad   = 3;
+                const xStep = W / (HISTORY_LEN - 1);
+
+                ctx.beginPath();
+                for (let i = 0; i < hist.length; i++) {
+                    const x = i * xStep;
+                    const y = H - pad - hist[i] * (H - pad * 2);
+                    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                }
+                ctx.lineTo((hist.length - 1) * xStep, H);
+                ctx.lineTo(0, H);
+                ctx.closePath();
+                ctx.globalAlpha = 0.15;
+                ctx.fillStyle = color;
+                ctx.fill();
+                ctx.globalAlpha = 1;
+
+                ctx.beginPath();
+                ctx.strokeStyle = color;
+                ctx.lineWidth   = 1.5;
+                ctx.lineJoin    = 'round';
+                for (let i = 0; i < hist.length; i++) {
+                    const x = i * xStep;
+                    const y = H - pad - hist[i] * (H - pad * 2);
+                    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+
+                const dotX = (hist.length - 1) * xStep;
+                const dotY = H - pad - v * (H - pad * 2);
+                ctx.beginPath();
+                ctx.arc(dotX, dotY, 2.5, 0, Math.PI * 2);
+                ctx.fillStyle = color;
+                ctx.fill();
+            }
+
+            if (metricValEls[key]) metricValEls[key].textContent = v.toFixed(2);
         }
+    }
+
+    // ── DOM refs ──────────────────────────────────────────────────────────────
+
+    const canvas          = document.getElementById('viz-canvas')      as HTMLCanvasElement;
+    const ctx             = canvas.getContext('2d')!;
+    const amDiv           = document.getElementById('viz-am-hidden')   as HTMLDivElement;
+    const overlay         = document.getElementById('vizOverlay')      as HTMLElement | null;
+    const vizHint         = document.getElementById('vizHint')         as HTMLElement | null;
+    const pauseBtn        = document.getElementById('vizPauseBtn')     as HTMLButtonElement | null;
+    const resetBtn        = document.getElementById('vizResetBtn')     as HTMLButtonElement | null;
+    const pulsePreview    = document.getElementById('vizPulsePreview') as HTMLElement | null;
+    const vizFileInput    = document.getElementById('vizFileInput')    as HTMLInputElement | null;
+    const speakerStartBtn = document.getElementById('speakerStartBtn') as HTMLButtonElement | null;
+    const speakerStopBtn  = document.getElementById('speakerStopBtn')  as HTMLButtonElement | null;
+    const micStartBtn     = document.getElementById('micStartBtn')     as HTMLButtonElement | null;
+    const micStopBtn      = document.getElementById('micStopBtn')      as HTMLButtonElement | null;
+
+    // ── Visualization state ───────────────────────────────────────────────────
+
+    let currentMoodId = 'calm';
+
+    const vizState = {
+        moodHue:          210,
+        layers: {
+            ground: { enabled: true },
+            flow:   { enabled: true },
+            form:   { enabled: true },
+            spark:  { enabled: true },
+            air:    { enabled: true },
+        } as Record<string, { enabled: boolean }>,
+        sparkRingEnabled: true,
+        highContrast:     false,
+        colorblindMode:   false,
+        reduceMotion:     false,
+        smoothMode:       false,
+        running:          false,
+        paused:           false,
+    };
+
+    const COLORBLIND_MAP: Record<string, number> = {
+        calm: 210, intense: 30, mysterious: 250,
+        bright: 55, dreamy: 250, energetic: 200,
+    };
+
+    // ── Mood helpers ──────────────────────────────────────────────────────────
+
+    function hexToHue(hex: string): number {
+        const r = parseInt(hex.slice(1, 3), 16) / 255;
+        const g = parseInt(hex.slice(3, 5), 16) / 255;
+        const b = parseInt(hex.slice(5, 7), 16) / 255;
+        const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+        if (d === 0) return 210;
+        let h = 0;
+        if (max === r)      h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+        else if (max === g) h = ((b - r) / d + 2) / 6;
+        else                h = ((r - g) / d + 4) / 6;
+        return Math.round(h * 360);
+    }
+
+    function applyMoodHue(hue: number) {
+        vizState.moodHue = hue;
+        document.documentElement.style.setProperty('--viz-hue-color', `oklch(65% 0.22 ${hue}deg)`);
+    }
+
+    const savedColor = localStorage.getItem('viz-mood-color');
+    if (savedColor?.startsWith('#')) applyMoodHue(hexToHue(savedColor));
+
+    // ── AudioMotionAnalyzer ───────────────────────────────────────────────────
+
+    let audioMotion:     AudioMotionAnalyzer | null = null;
+    let metricsAnalyser: AnalyserNode | null = null;
+
+    function initAudioMotion() {
+        audioMotion?.destroy();
+        audioMotion = new AudioMotionAnalyzer(amDiv, {
+            fftSize:         8192,
+            smoothing:       0.8,
+            connectSpeakers: false,
+            onCanvasDraw:    renderFrame,
+            start:           false,
+        });
+        state.sampleRate = audioMotion.audioCtx.sampleRate;
+        metricsAnalyser = audioMotion.audioCtx.createAnalyser();
+        metricsAnalyser.fftSize = 2048;
+        metricsAnalyser.smoothingTimeConstant = 0.78;
+        audioMotion.start();
+    }
+    initAudioMotion();
+
+    // ── Band energy ───────────────────────────────────────────────────────────
+
+    function getBands() {
+        if (!audioMotion) return { ground: 0, flow: 0, form: 0, spark: 0, air: 0, overall: 0 };
+        const v = (id: string, raw: number) => vizState.layers[id].enabled ? raw : 0;
+        return {
+            ground:  v('ground', audioMotion.getEnergy(20,   200)),
+            flow:    v('flow',   audioMotion.getEnergy(200,  800)),
+            form:    v('form',   audioMotion.getEnergy(800,  3000)),
+            spark:   v('spark',  audioMotion.getEnergy(3000, 8000)),
+            air:     v('air',    audioMotion.getEnergy(8000, 20000)),
+            overall: audioMotion.getEnergy(),
+        };
+    }
+
+    // ── Beat detection (EMA) ──────────────────────────────────────────────────
+
+    let beatEMA = 0, lastBeatTime = 0;
+
+    function detectBeat(energy: number, now: number): boolean {
+        const alpha = vizState.smoothMode ? 0.05 : 0.1;
+        beatEMA = beatEMA * (1 - alpha) + energy * alpha;
+        const threshold = 1 + 0.6 * 0.8;
+        if (energy > beatEMA * threshold && energy > 0.05 && now - lastBeatTime > 250) {
+            lastBeatTime = now;
+            return true;
+        }
+        return false;
+    }
+
+    // ── Canvas resize ─────────────────────────────────────────────────────────
+
+    function resizeCanvas() {
+        const wrap = canvas.parentElement!;
+        canvas.width  = wrap.clientWidth;
+        canvas.height = wrap.clientHeight;
+    }
+    const resizeObserver = new ResizeObserver(resizeCanvas);
+    resizeObserver.observe(canvas.parentElement!);
+    resizeCanvas();
+
+    // ── Beat flash + grid ─────────────────────────────────────────────────────
+
+    let beatFlashAlpha  = 0;
+    const BEAT_GRID_SIZE  = 16;
+    const GRID_SLOT_MS    = 250;
+    const beatGrid        = new Array<boolean>(BEAT_GRID_SIZE).fill(false);
+    let   beatGridIdx     = 0;
+    let   lastGridAdvance = 0;
+
+    // ── Pulse rings ───────────────────────────────────────────────────────────
+
+    interface PulseRing { r: number; maxR: number; life: number; maxLife: number; hue: number; }
+    let pulseRings: PulseRing[] = [];
+
+    // ── Peak hold markers ─────────────────────────────────────────────────────
+
+    const PEAK_HOLD_MS = 1800;
+    const peakHold: { val: number; heldAt: number }[] = [
+        { val: 0, heldAt: 0 }, { val: 0, heldAt: 0 }, { val: 0, heldAt: 0 },
+        { val: 0, heldAt: 0 }, { val: 0, heldAt: 0 },
+    ];
+
+    function spawnPulseRing(cx: number, cy: number, hue: number) {
+        if (!vizState.sparkRingEnabled) return;
+        const minDim = Math.min(cx, cy);
+        pulseRings.push({ r: minDim * 0.12, maxR: minDim * 0.92, life: 0, maxLife: 44, hue });
+    }
+
+    // ── Drawing helpers ───────────────────────────────────────────────────────
+
+    let time = 0;
+
+    // 1. Background — iridescent radial gradient
+    function drawBackground(cx: number, cy: number, bands: ReturnType<typeof getBands>, hue: number) {
+        const L = vizState.highContrast ? 8 + bands.overall * 14 : 2 + bands.overall * 6;
+        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(cx, cy));
+        g.addColorStop(0,   `oklch(${L * 2.5}% 0.08 ${hue + bands.overall * 20})`);
+        g.addColorStop(0.5, `oklch(${L * 1.5}% 0.05 ${hue + 50})`);
+        g.addColorStop(1,   `oklch(${L}% 0.04 ${hue + 100})`);
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    // 2. Beat flash — iridescent rainbow vignette from center
+    function drawBeatFlash(W: number, H: number, hue: number) {
+        if (beatFlashAlpha <= 0) return;
+        const cx    = W / 2, cy = H / 2;
+        const flash = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(cx, cy) * 1.3);
+        const a     = beatFlashAlpha;
+        flash.addColorStop(0,    `oklch(96% 0.44 ${hue}        / ${a})`);
+        flash.addColorStop(0.25, `oklch(88% 0.38 ${hue + 60}   / ${a * 0.65})`);
+        flash.addColorStop(0.55, `oklch(78% 0.30 ${hue + 130}  / ${a * 0.30})`);
+        flash.addColorStop(0.8,  `oklch(68% 0.22 ${hue + 200}  / ${a * 0.10})`);
+        flash.addColorStop(1,    `oklch(58% 0.14 ${hue + 260}  / 0)`);
+        ctx.fillStyle = flash;
+        ctx.fillRect(0, 0, W, H);
+    }
+
+    // 3. Breathing circle — the main visual focus
+    function drawBreathingCircle(cx: number, cy: number, bands: ReturnType<typeof getBands>, hue: number) {
+        const openSize    = 128;
+        const breathFloor = 128;
+        const r           = breathFloor * (1 - beatFlashAlpha) + openSize * beatFlashAlpha;
+        const L           = vizState.highContrast ? 55 + bands.overall * 22 : 30 + bands.overall * 32;
+        const lw          = (3 + bands.overall * 8) * (vizState.highContrast ? 1.6 : 1);
+
+        if (beatFlashAlpha > 0.01) {
+            const glow  = ctx.createRadialGradient(cx, cy, r * 0.3, cx, cy, r * 1.9);
+            const glowE = bands.overall;
+            glow.addColorStop(0,    `oklch(${L + 18}% 0.42 ${hue + glowE * 30}       / 0.50)`);
+            glow.addColorStop(0.35, `oklch(${L + 8}%  0.34 ${hue + 80 + glowE * 20}  / 0.22)`);
+            glow.addColorStop(0.7,  `oklch(${L}%      0.24 ${hue + 160}              / 0.08)`);
+            glow.addColorStop(1,    `oklch(${L - 8}%  0.14 ${hue + 220}              / 0)`);
+            ctx.beginPath();
+            ctx.arc(cx, cy, r * 1.9, 0, Math.PI * 2);
+            ctx.fillStyle = glow;
+            ctx.fill();
+        }
+
+        const roughness = vizState.running ? (bands.spark + bands.air) * 0.5 * 240 : 0;
+        ctx.beginPath();
+        if (roughness > 0.25) {
+            const segs = 120;
+            for (let i = 0; i <= segs; i++) {
+                const angle = (i / segs) * Math.PI * 2;
+                const noise = (
+                    Math.sin(angle * 6  + time * 5)  * 0.60 +
+                    Math.sin(angle * 13 + time * 8)  * 0.55 +
+                    Math.sin(angle * 23 + time * 13) * 0.35
+                ) * roughness;
+                const rr = r + noise;
+                const x  = cx + Math.cos(angle) * rr;
+                const y  = cy + Math.sin(angle) * rr;
+                if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            }
+            ctx.closePath();
+        } else {
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        }
+
+        const cos = Math.cos(time * 0.4);
+        const sin = Math.sin(time * 0.4);
+        const sg  = ctx.createLinearGradient(cx - r * cos, cy - r * sin, cx + r * cos, cy + r * sin);
+        sg.addColorStop(0,    `oklch(${L}%      0.38 ${hue})`);
+        sg.addColorStop(0.33, `oklch(${L + 14}% 0.46 ${hue + 70})`);
+        sg.addColorStop(0.67, `oklch(${L + 8}%  0.42 ${hue + 140})`);
+        sg.addColorStop(1,    `oklch(${L + 20}% 0.50 ${hue + 210})`);
+        ctx.strokeStyle = sg;
+        ctx.lineWidth   = lw;
+        ctx.stroke();
+
+        ctx.globalAlpha = 0.12;
+        ctx.fillStyle   = `oklch(${L}% 0.32 ${hue})`;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+    }
+
+    // 4. Frequency bars — iridescent with peak hold, shimmer, tip burst
+    const FREQ_BARS = [
+        { id: 'air',    label: 'AIR',   hueShift: 80 },
+        { id: 'spark',  label: 'HIGH',  hueShift: 60 },
+        { id: 'form',   label: 'MID',   hueShift: 40 },
+        { id: 'flow',   label: 'LOW',   hueShift: 20 },
+        { id: 'ground', label: 'BASS',  hueShift:  0 },
+    ] as const;
+
+    function drawFrequencyBars(W: number, H: number, bands: ReturnType<typeof getBands>, hue: number) {
+        const barH    = 30;
+        const gap     = 13;
+        const rows    = FREQ_BARS.length;
+        const totalH  = rows * (barH + gap) - gap;
+        const maxBarW = Math.min(W * 0.38, 300);
+        const leftX   = 14;
+        const labelW  = 38;
+        const barX    = leftX + labelW + 6;
+        const startY  = H - 42 - totalH;
+        const nowMs   = performance.now();
+        const tSec    = nowMs * 0.001;
+
+        ctx.font         = '800 10px system-ui';
+        ctx.textBaseline = 'middle';
+
+        for (let i = 0; i < rows; i++) {
+            const { id, label, hueShift } = FREQ_BARS[i];
+            const y      = startY + i * (barH + gap);
+            const midY   = y + barH / 2;
+            const energy = (bands as Record<string, number>)[id] ?? 0;
+            const bHue   = hue + hueShift;
+            const lum    = vizState.highContrast ? 58 + energy * 28 : 38 + energy * 40;
+            const pk     = peakHold[i];
+
+            if (energy > pk.val) {
+                pk.val = energy; pk.heldAt = nowMs;
+            } else if (nowMs - pk.heldAt > PEAK_HOLD_MS) {
+                pk.val = Math.max(0, pk.val - 0.004);
+            }
+
+            ctx.textAlign = 'right';
+            ctx.fillStyle = vizState.highContrast
+                ? `oklch(55% 0.10 ${bHue})`
+                : `oklch(35% 0.07 ${bHue})`;
+            ctx.fillText(label, leftX + labelW, midY);
+
+            ctx.beginPath();
+            ctx.roundRect(barX, y, maxBarW, barH, 8);
+            ctx.fillStyle = `oklch(9% 0.03 ${bHue})`;
+            ctx.fill();
+
+            if (energy > 0.005) {
+                const filled = maxBarW * Math.min(energy, 1);
+
+                ctx.beginPath();
+                ctx.roundRect(barX - 3, y - 5, filled + 6, barH + 10, 10);
+                ctx.fillStyle = `oklch(${lum}% 0.38 ${bHue} / 0.30)`;
+                ctx.fill();
+
+                const barGrad = ctx.createLinearGradient(barX, 0, barX + filled, 0);
+                barGrad.addColorStop(0,    `oklch(${lum}%      0.36 ${bHue})`);
+                barGrad.addColorStop(0.45, `oklch(${lum + 12}% 0.46 ${bHue + 45})`);
+                barGrad.addColorStop(1,    `oklch(${lum + 24}% 0.54 ${bHue + 90})`);
+                ctx.beginPath();
+                ctx.roundRect(barX, y, filled, barH, 8);
+                ctx.fillStyle = barGrad;
+                ctx.fill();
+
+                if (!vizState.reduceMotion) {
+                    const sweepFrac = Math.sin(tSec * 1.8 + i * 1.1) * 0.5 + 0.5;
+                    const sweepX    = barX + sweepFrac * filled;
+                    const shimW     = Math.max(20, Math.min(filled * 0.35, 80));
+                    const sh = ctx.createLinearGradient(sweepX - shimW, 0, sweepX + shimW, 0);
+                    sh.addColorStop(0,   `oklch(98% 0.40 ${bHue + 120} / 0)`);
+                    sh.addColorStop(0.5, `oklch(98% 0.40 ${bHue + 120} / 0.42)`);
+                    sh.addColorStop(1,   `oklch(98% 0.40 ${bHue + 120} / 0)`);
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.roundRect(barX, y, filled, barH, 8);
+                    ctx.clip();
+                    ctx.fillStyle = sh;
+                    ctx.fillRect(sweepX - shimW, y, shimW * 2, barH);
+                    ctx.restore();
+                }
+
+                if (energy > 0.55) {
+                    const tipAlpha = ((energy - 0.55) / 0.45) * 0.90;
+                    const tipX = barX + filled;
+                    const tg = ctx.createRadialGradient(tipX, midY, 0, tipX, midY, barH * 1.3);
+                    tg.addColorStop(0, `oklch(98% 0.54 ${bHue + 90} / ${tipAlpha})`);
+                    tg.addColorStop(1, `oklch(80% 0.34 ${bHue + 130} / 0)`);
+                    ctx.beginPath();
+                    ctx.arc(tipX, midY, barH * 1.3, 0, Math.PI * 2);
+                    ctx.fillStyle = tg;
+                    ctx.fill();
+                }
+            }
+
+            if (pk.val > 0.01) {
+                const pkX = barX + maxBarW * Math.min(pk.val, 1);
+                const pkA = Math.min(1, pk.val * 2);
+                ctx.beginPath();
+                ctx.roundRect(pkX - 5, y, 9, barH, 4);
+                ctx.fillStyle = `oklch(88% 0.44 ${bHue + 60} / ${pkA * 0.28})`;
+                ctx.fill();
+                ctx.beginPath();
+                ctx.roundRect(pkX - 2, y + 4, 3, barH - 8, 2);
+                ctx.fillStyle = `oklch(96% 0.52 ${bHue + 60} / ${pkA})`;
+                ctx.fill();
+            }
+        }
+
+        ctx.textAlign    = 'left';
+        ctx.textBaseline = 'alphabetic';
+    }
+
+    // 5. Pulse rings — iridescent
+    function drawPulseRings(cx: number, cy: number, hue: number) {
+        pulseRings = pulseRings.filter(r => r.life < r.maxLife);
+        for (const ring of pulseRings) {
+            const progress = ring.life / ring.maxLife;
+            const r        = ring.r + (ring.maxR - ring.r) * progress;
+            const alpha    = (1 - progress) * 0.9;
+            const lw       = (4 - progress * 3) * (vizState.highContrast ? 2 : 1);
+            const rGrad    = ctx.createLinearGradient(cx - r, cy, cx + r, cy);
+            rGrad.addColorStop(0,   `oklch(80% 0.42 ${hue + ring.life * 4})`);
+            rGrad.addColorStop(0.5, `oklch(88% 0.48 ${hue + 80 + ring.life * 3})`);
+            rGrad.addColorStop(1,   `oklch(82% 0.44 ${hue + 160 + ring.life * 2})`);
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.strokeStyle = rGrad;
+            ctx.lineWidth   = lw;
+            ctx.globalAlpha = alpha;
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+            ring.life++;
+        }
+    }
+
+    // ── Main render frame ─────────────────────────────────────────────────────
+
+    function renderFrame() {
+        const W = canvas.width, H = canvas.height;
+        if (W === 0 || H === 0) return;
+
+        // Feed metric graphs from raw analyser data; capture energy for beat detection
+        let metricsEnergy = 0;
+        if (metricsAnalyser) {
+            const freqData = new Uint8Array(metricsAnalyser.frequencyBinCount);
+            const timeData = new Uint8Array(metricsAnalyser.fftSize);
+            metricsAnalyser.getByteFrequencyData(freqData);
+            metricsAnalyser.getByteTimeDomainData(timeData);
+            const features = getAudioFeatures(freqData, timeData);
+            const { isBeat: _isBeat, ...numericFeatures } = features;
+            updateMetricBars(numericFeatures);
+            metricsEnergy = features.energy as number;
+        }
+
+        const cx  = W / 2, cy = H / 2;
+        const now = performance.now();
+        const hue = vizState.colorblindMode
+            ? (COLORBLIND_MAP[currentMoodId] ?? vizState.moodHue)
+            : vizState.moodHue;
+        const bands = getBands();
+
+        // Advance beat grid slot
+        if (now - lastGridAdvance > GRID_SLOT_MS) {
+            beatGridIdx = (beatGridIdx + 1) % BEAT_GRID_SIZE;
+            beatGrid[beatGridIdx] = false;
+            lastGridAdvance = now;
+        }
+
+        // Beat → flash + grid + ring (use metricsAnalyser energy — same source as the metrics panel)
+        if (detectBeat(metricsEnergy > 0 ? metricsEnergy : bands.overall, now)) {
+            if (!vizState.reduceMotion) beatFlashAlpha = 1;
+            beatGrid[beatGridIdx] = true;
+            if (!vizState.reduceMotion) spawnPulseRing(cx, cy, hue);
+        }
+        if (beatFlashAlpha > 0) beatFlashAlpha = Math.max(0, beatFlashAlpha - 0.03);
+
+        // Draw order
+        drawBackground(cx, cy, bands, hue);
+        if (!vizState.reduceMotion) {
+            time += 0.016;
+            drawBeatFlash(W, H, hue);
+        }
+        drawFrequencyBars(W, H, bands, hue);
+        drawBreathingCircle(cx, cy, bands, hue);
+        drawPulseRings(cx, cy, hue);
+
+        if (pulsePreview) {
+            pulsePreview.style.transform = `scale(${1 + bands.overall * 0.5})`;
+        }
+    }
+
+    // ── Hint overlay ──────────────────────────────────────────────────────────
+
+    let hintTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    function showHint() {
+        if (!vizHint) return;
+        vizHint.dataset.state = 'visible';
+        if (hintTimeout) clearTimeout(hintTimeout);
+        hintTimeout = setTimeout(() => { if (vizHint) delete vizHint.dataset.state; }, 7000);
+    }
+
+    function hideHint() {
+        if (hintTimeout) {
+            clearTimeout(hintTimeout);
+            hintTimeout = null;
+        }
+        if (vizHint) delete vizHint.dataset.state;
     }
 
     // ── Capture control ───────────────────────────────────────────────────────
 
+    let bufferSource: AudioBufferSourceNode | null = null;
+    let sourceNode:   AudioNode | null = null;
+    let mediaStream:  MediaStream | null = null;
+
+    function setOverlay(s: 'idle' | 'running') {
+        if (overlay) overlay.dataset.state = s;
+    }
+
+    function setRunning(on: boolean) {
+        vizState.running = on;
+        vizState.paused  = false;
+        if (pauseBtn) {
+            pauseBtn.disabled    = !on;
+            pauseBtn.textContent = 'Pause';
+        }
+    }
+
     function stopCapture() {
         if (bufferSource) {
-            try { bufferSource.stop(); } catch {}
+            try {
+                bufferSource.stop();
+            } catch (err) {
+                console.error('Error stopping buffer source:', err);
+            }
             bufferSource.disconnect();
             bufferSource = null;
         }
-        if (sourceNode)  { sourceNode.disconnect();  sourceNode  = null; }
-        if (silentGain)  { silentGain.disconnect();  silentGain  = null; }
-        if (analyser)    { analyser.disconnect();    analyser    = null; }
-        if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
-        if (audioContext) audioContext.onstatechange = null;
-        if (animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
+        if (sourceNode) {
+            sourceNode.disconnect();
+            sourceNode = null;
+        }
+        try {
+            audioMotion?.disconnectInput();
+        } catch (err) {
+            console.error('Error disconnecting audio input:', err);
+        }
+        if (mediaStream) {
+            mediaStream.getTracks().forEach(t => t.stop());
+            mediaStream = null;
+        }
 
-        dataArray       = null;
-        timeDomainArray = null;
-
+        if (vizFileInput)    vizFileInput.value       = '';
         if (speakerStartBtn) speakerStartBtn.disabled = false;
         if (speakerStopBtn)  speakerStopBtn.disabled  = true;
         if (micStartBtn)     micStartBtn.disabled     = false;
         if (micStopBtn)      micStopBtn.disabled      = true;
 
-        if (moodDisplay) moodDisplay.textContent = '';
-        lchHistory.length = 0;
+        setRunning(false);
+        setOverlay('idle');
+        hideHint();
+
+        pulseRings     = [];
+        beatFlashAlpha = 0;
+        beatEMA        = 0;
+        beatGrid.fill(false);
+
         state.energyHistory.length = 0;
-        resetCanvas();
+        state.prevSpectrum = null;
+        state.onsetTimes.length = 0;
+        state.energyEMA = 0;
         resetMetricBars();
     }
 
-    // ── Tab switching ─────────────────────────────────────────────────────────
+    async function ensureAudioCtx() {
+        if (!audioMotion) initAudioMotion();
+        const actx = audioMotion!.audioCtx;
+        if (actx.state === 'suspended') await actx.resume();
+        return actx;
+    }
 
-    document.querySelectorAll('.tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-            const mode = (tab as HTMLElement).dataset.mode;
-            if ((tab as HTMLElement).dataset.state === 'active') return;
-            stopCapture();
-            document.querySelectorAll('.tab').forEach(t =>
-                ((t as HTMLElement).dataset.state = t === tab ? 'active' : ''));
-            document.querySelectorAll('.ctrl-panel').forEach(p =>
-                ((p as HTMLElement).dataset.state = p.id === `ctrl-${mode}` ? 'active' : ''));
-            if (audioFileInput) audioFileInput.value = '';
-        });
-    });
+    // ── File ──────────────────────────────────────────────────────────────────
 
-    // ── File input ────────────────────────────────────────────────────────────
-
-    audioFileInput?.addEventListener('change', async (event) => {
-        const file = (event.target as HTMLInputElement).files?.[0];
+    vizFileInput?.addEventListener('change', async () => {
+        const file = vizFileInput.files?.[0];
         if (!file) return;
         stopCapture();
         try {
-            await ensureAudioContext();
-            setupAnalyser();
-            const reader = new FileReader();
-            reader.onload = async (e) => {
+            const actx = await ensureAudioCtx();
+            const audioBuffer = await actx.decodeAudioData(await file.arrayBuffer());
+            bufferSource = actx.createBufferSource();
+            bufferSource.buffer = audioBuffer;
+            audioMotion!.connectInput(bufferSource);
+            bufferSource.connect(actx.destination);
+            if (metricsAnalyser) bufferSource.connect(metricsAnalyser);
+            bufferSource.start(actx.currentTime + 0.2);
+            bufferSource.onended = () => {
                 try {
-                    const audioBuffer = await audioContext!.decodeAudioData(e.target!.result as ArrayBuffer);
-                    bufferSource = audioContext!.createBufferSource();
-                    bufferSource.buffer = audioBuffer;
-                    bufferSource.connect(analyser!);
-                    analyser!.connect(audioContext!.destination);
-                    bufferSource.start(0);
-                    bufferSource.onended = () => {
-                        if (bufferSource) { bufferSource.disconnect(); bufferSource = null; }
-                    };
-                    if (!animationFrameId) drawVisualization();
+                    audioMotion?.disconnectInput(bufferSource!);
                 } catch (err) {
-                    console.error('Audio decode error:', err);
-                    alert('Could not decode this audio file. Try MP3, WAV, or OGG.');
+                    console.error('Error disconnecting buffer source:', err);
                 }
+                bufferSource = null;
+                setRunning(false);
+                setOverlay('idle');
             };
-            reader.onerror = () => alert('Could not read the selected file.');
-            reader.readAsArrayBuffer(file);
+            setRunning(true);
+            setOverlay('running');
+            showHint();
         } catch (err) {
-            console.error('Audio setup error:', err);
+            console.error('Audio file error:', err);
+            alert('Could not decode this audio file. Try MP3, WAV, or OGG.');
         }
     });
 
@@ -658,14 +1009,16 @@ export function initViewScript(): () => void {
                 return;
             }
             mediaStream.getVideoTracks().forEach(t => t.stop());
-            await ensureAudioContext();
-            setupAnalyser();
-            sourceNode = audioContext!.createMediaStreamSource(mediaStream);
-            sourceNode.connect(analyser!);
+            const actx = await ensureAudioCtx();
+            sourceNode = actx.createMediaStreamSource(mediaStream);
+            audioMotion!.connectInput(sourceNode);
+            if (metricsAnalyser) sourceNode.connect(metricsAnalyser);
             audioTracks[0].onended = stopCapture;
             if (speakerStartBtn) speakerStartBtn.disabled = true;
             if (speakerStopBtn)  speakerStopBtn.disabled  = false;
-            if (!animationFrameId) drawVisualization();
+            setRunning(true);
+            setOverlay('running');
+            showHint();
         } catch (err: unknown) {
             if ((err as { name?: string }).name !== 'NotAllowedError') {
                 console.error('Speaker capture error:', err);
@@ -682,21 +1035,16 @@ export function initViewScript(): () => void {
         stopCapture();
         try {
             mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            await ensureAudioContext();
-            setupAnalyser();
-            sourceNode = audioContext!.createMediaStreamSource(mediaStream);
-            silentGain = audioContext!.createGain();
-            silentGain.gain.value = 0;
-            sourceNode.connect(analyser!);
-            analyser!.connect(silentGain);
-            silentGain.connect(audioContext!.destination);
-            audioContext!.onstatechange = () => {
-                if (audioContext && audioContext.state === 'suspended') audioContext.resume();
-            };
+            const actx = await ensureAudioCtx();
+            sourceNode = actx.createMediaStreamSource(mediaStream);
+            audioMotion!.connectInput(sourceNode);
+            if (metricsAnalyser) sourceNode.connect(metricsAnalyser);
             mediaStream.getAudioTracks()[0].onended = stopCapture;
             if (micStartBtn) micStartBtn.disabled = true;
             if (micStopBtn)  micStopBtn.disabled  = false;
-            if (!animationFrameId) drawVisualization();
+            setRunning(true);
+            setOverlay('running');
+            showHint();
         } catch (err: unknown) {
             if ((err as { name?: string }).name !== 'NotAllowedError') {
                 console.error('Microphone error:', err);
@@ -707,49 +1055,104 @@ export function initViewScript(): () => void {
 
     micStopBtn?.addEventListener('click', stopCapture);
 
-    // ── Draw loop ─────────────────────────────────────────────────────────────
+    // ── Playback controls ─────────────────────────────────────────────────────
 
-    function drawVisualization() {
-        if (!analyser || (!bufferSource && !sourceNode)) {
-            if (animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
-            resetCanvas();
-            if (moodDisplay) moodDisplay.textContent = '';
-            resetMetricBars();
-            return;
-        }
+    pauseBtn?.addEventListener('click', () => {
+        if (!audioMotion || !vizState.running) return;
+        vizState.paused = !vizState.paused;
+        audioMotion.toggleAnalyzer(!vizState.paused);
+        if (pauseBtn) pauseBtn.textContent = vizState.paused ? 'Resume' : 'Pause';
+    });
+    resetBtn?.addEventListener('click', stopCapture);
 
-        animationFrameId = requestAnimationFrame(drawVisualization);
+    // ── Tab switching ─────────────────────────────────────────────────────────
 
-        analyser.getByteFrequencyData(dataArray!);
-        analyser.getByteTimeDomainData(timeDomainArray!);
+    document.querySelectorAll<HTMLButtonElement>('.viz-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            if (tab.dataset.state === 'active') return;
+            stopCapture();
+            const mode = tab.dataset.mode!;
+            document.querySelectorAll<HTMLElement>('.viz-tab').forEach(t => {
+                t.dataset.state = '';
+                t.setAttribute('aria-selected', 'false');
+            });
+            tab.dataset.state = 'active';
+            tab.setAttribute('aria-selected', 'true');
+            document.querySelectorAll<HTMLElement>('.viz-input-panel').forEach(p => {
+                p.dataset.state = p.id === `panel-${mode}` ? 'active' : '';
+            });
+        });
+    });
 
-        const features = getAudioFeatures(dataArray!, timeDomainArray!);
-        const mood     = getMood(features);
-        const { l, c, h } = moodToColor(mood, features.energy);
+    // ── Mood buttons ──────────────────────────────────────────────────────────
 
-        lchHistory.push({ l, c, h });
-        if (lchHistory.length > NUM_HISTORY) lchHistory.shift();
+    document.querySelectorAll<HTMLButtonElement>('.viz-mood-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll<HTMLElement>('.viz-mood-btn').forEach(b => {
+                b.dataset.state = '';
+                b.setAttribute('aria-pressed', 'false');
+            });
+            btn.dataset.state = 'active';
+            btn.setAttribute('aria-pressed', 'true');
+            currentMoodId = btn.dataset.mood ?? 'calm';
+            applyMoodHue(Number(btn.dataset.hue ?? 210));
+        });
+    });
 
-        if (canvasCtx && canvas) {
-            const n    = lchHistory.length;
-            const avgL = lchHistory.reduce((s, v) => s + v.l, 0) / n;
-            const avgC = lchHistory.reduce((s, v) => s + v.c, 0) / n;
-            const avgH = lchHistory.reduce((s, v) => s + v.h, 0) / n;
+    // ── Energy layer checkboxes ───────────────────────────────────────────────
 
-            canvasCtx.fillStyle = `oklch(${Math.round(avgL)}% ${avgC.toFixed(3)} ${Math.round(avgH)})`;
-            canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
-        }
+    document.querySelectorAll<HTMLInputElement>('.viz-layer__toggle').forEach(toggle => {
+        toggle.addEventListener('change', () => {
+            const id = toggle.dataset.layer!;
+            if (vizState.layers[id]) {
+                vizState.layers[id].enabled = toggle.checked;
+                const wrap = document.getElementById(`layer-wrap-${id}`);
+                if (wrap) wrap.dataset.active = String(toggle.checked);
+            }
+        });
+    });
 
-        if (moodDisplay) moodDisplay.textContent = mood;
-        updateMetricBars(features);
+    // ── Visual option toggles ─────────────────────────────────────────────────
+
+    function bindToggle(id: string, setter: (v: boolean) => void) {
+        const el = document.getElementById(id) as HTMLInputElement | null;
+        el?.addEventListener('change', e => setter((e.target as HTMLInputElement).checked));
     }
+    bindToggle('sparkRingToggle', v => { vizState.sparkRingEnabled = v; });
+    bindToggle('highContrast',    v => { vizState.highContrast     = v; });
+    bindToggle('colorblindMode',  v => { vizState.colorblindMode   = v; });
+    bindToggle('reduceMotion',    v => { vizState.reduceMotion = v; });
+
+    // Sync reduceMotion with prefers-reduced-motion
+    const motionMQ = window.matchMedia('(prefers-reduced-motion: reduce)');
+    function applyMotionMQ(matches: boolean) {
+        const el = document.getElementById('reduceMotion') as HTMLInputElement | null;
+        if (matches) {
+            vizState.reduceMotion = true;
+            if (el) el.checked = true;
+        }
+    }
+    applyMotionMQ(motionMQ.matches);
+    motionMQ.addEventListener('change', e => applyMotionMQ(e.matches));
+    bindToggle('smoothMode',      v => { vizState.smoothMode        = v; });
+
+    // ── Help dropdown ─────────────────────────────────────────────────────────
+
+    document.getElementById('vizHelpBtn')?.addEventListener('click', () => {
+        const drop = document.getElementById('vizHelpDrop');
+        const btn  = document.getElementById('vizHelpBtn') as HTMLButtonElement | null;
+        if (!drop || !btn) return;
+        const isOpen = drop.dataset.state === 'open';
+        drop.dataset.state = isOpen ? '' : 'open';
+        btn.setAttribute('aria-expanded', String(!isOpen));
+        btn.classList.toggle('active', !isOpen);
+    });
 
     // ── Cleanup ───────────────────────────────────────────────────────────────
 
     return () => {
         stopCapture();
-        if (audioContext && audioContext.state !== 'closed') {
-            audioContext.close().catch(() => {});
-        }
+        audioMotion?.destroy();
+        resizeObserver.disconnect();
     };
 }
