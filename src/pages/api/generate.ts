@@ -49,7 +49,10 @@ export const POST: APIRoute = async ({ request }) => {
         payload = requestSchema.parse(body);
     } catch (error) {
         if (error instanceof z.ZodError) {
-            return Response.json({ error: 'Invalid request body', details: error.issues }, { status: 400 });
+            return Response.json(
+                { error: 'Invalid request body', details: error.issues }, 
+                { status: 400 }
+            );
         }
         return Response.json({ error: 'Request body must be valid JSON' }, { status: 400 });
     }
