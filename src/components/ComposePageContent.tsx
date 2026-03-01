@@ -55,7 +55,6 @@ export default function ComposePageContent() {
                             <button
                                 key={m.value}
                                 className="mood-btn"
-                                enable-xr={true}
                                 data-mood={m.value}
                                 data-color={m.color}
                                 data-pulse={m.pulse}

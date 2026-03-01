@@ -8,7 +8,7 @@ export default function ViewPageContent() {
         <div className="view-page" enable-xr={true}>
             <h1>Audio to Color</h1>
 
-            <div id="mode-tabs" className="mode-tabs" enable-xr={true}>
+            <div id="mode-tabs" className="mode-tabs">
                 <button type="button" className="tab" data-state="active" data-mode="file">File</button>
                 <button type="button" className="tab" data-mode="speaker">Speaker / Tab</button>
                 <button type="button" className="tab" data-mode="microphone">Microphone</button>
@@ -34,7 +34,7 @@ export default function ViewPageContent() {
             <p id="mood" className="mood"></p>
 
             {/* Metric rows are injected dynamically by viewScript.ts */}
-            <div id="metrics" className="metrics" enable-xr={true}></div>
+            <div id="metrics" className="metrics"></div>
 
             <ViewScriptRunner />
         </div>
