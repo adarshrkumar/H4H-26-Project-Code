@@ -1,5 +1,5 @@
-import ComposePageContent from './components/ComposePageContent';
+import GeneratePageContent from './components/GeneratePageContent';
 
 export default function App() {
-    return <ComposePageContent />;
+    return <GeneratePageContent />;
 }
