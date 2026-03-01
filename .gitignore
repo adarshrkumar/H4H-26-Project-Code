@@ -30,4 +30,4 @@ npm-debug.log*
 *.tsbuildinfo
 
 # Vercel
-.vercel/
+.vercel
