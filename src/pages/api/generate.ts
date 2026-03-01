@@ -1,41 +1,12 @@
 import 'dotenv/config';
 import type { APIRoute } from 'astro';
 import { z } from 'zod';
-import { Music } from '@elevenlabs/elevenlabs-js';
-import { uploadFile, getFileUrl } from '@/lib/uploadthing';
-
-const OUTPUT_FORMAT = 'mp3_44100_128' as const;
-
-let _music: Music | null = null;
-function getMusic(): Music {
-    if (!_music) {
-        const apiKey =
-            (import.meta as unknown as { env: Record<string, string> }).env?.ELEVENLABS_API_KEY ??
-            process.env.ELEVENLABS_API_KEY;
-        _music = new Music({ apiKey });
-    }
-    return _music;
-}
-
-function isElevenLabsError(err: unknown): err is { statusCode: number; body: Record<string, unknown> } {
-    return (
-        err !== null &&
-        typeof err === 'object' &&
-        'statusCode' in err &&
-        'body' in err &&
-        typeof (err as Record<string, unknown>).body === 'object'
-    );
-}
+import { generateAndSave, GenerateAndSaveError } from '@/lib/generate-and-save';
 
 const requestSchema = z.object({
-    text: z.string().min(1, 'text is required').max(5000, 'text is too long'),
-    title: z.string().min(1).max(255).optional(),
-    artist: z.string().min(1).max(255).optional(),
-    voiceId: z.string().min(1).optional(),
-    modelId: z.string().min(1).optional(),
-    outputFormat: z.string().min(1).optional(),
-    // Duration in ms (3 000 – 120 000). Drives per-section length so the full
-    // song lands between ~2:30 and 4:00.
+    text:         z.string().min(1, 'text is required').max(5000, 'text is too long'),
+    title:        z.string().min(1).max(255).optional(),
+    artist:       z.string().min(1).max(255).optional(),
     musicLengthMs: z.number().int().min(3000).max(240000).optional(),
 });
 
@@ -52,59 +23,17 @@ export const POST: APIRoute = async ({ request }) => {
         return Response.json({ error: 'Request body must be valid JSON' }, { status: 400 });
     }
 
-    // Generate music via ElevenLabs
-    let audio: Buffer;
-    let filename: string;
-    let songTitle: string;
-
     try {
-        const result = await getMusic().composeDetailed({
-            prompt: payload.text,
-            outputFormat: OUTPUT_FORMAT,
-            ...(payload.musicLengthMs !== undefined && { musicLengthMs: payload.musicLengthMs }),
-        });
-
-        audio = result.audio;
-        filename = result.filename;
-        songTitle = payload.title ?? result.json.songMetadata.title ?? payload.text.slice(0, 60);
+        const result = await generateAndSave(payload);
+        return Response.json(result, { status: 201 });
     } catch (err) {
-        if (isElevenLabsError(err)) {
-            const code = err.body?.error as string | undefined;
-            if (code === 'bad_prompt') {
-                return Response.json({
-                    error: 'Prompt contains copyrighted material.',
-                    suggestion: (err.body?.prompt_suggestion as string) ?? undefined,
-                }, { status: 400 });
-            }
+        if (err instanceof GenerateAndSaveError) {
+            const details = err.details !== null && typeof err.details === 'object'
+                ? err.details as Record<string, unknown>
+                : {};
+            return Response.json({ error: err.message, ...details }, { status: err.status });
         }
-        console.error('[api/generate] ElevenLabs error:', err);
-        return Response.json({ error: 'Failed to generate music' }, { status: 500 });
+        console.error('[api/generate]', err);
+        return Response.json({ error: 'Failed to generate and save' }, { status: 500 });
     }
-
-    // Upload to UploadThing
-    let fileKey: string;
-    let fileUrl: string | undefined;
-
-    try {
-        const file = new File([new Uint8Array(audio)], filename, { type: 'audio/mpeg' });
-        const uploaded = await uploadFile(file);
-        fileKey = uploaded.data?.key ?? '';
-        fileUrl = fileKey ? getFileUrl(fileKey) : undefined;
-    } catch (err) {
-        console.error('[api/generate] UploadThing error:', err);
-        return Response.json({ error: 'Failed to upload audio' }, { status: 500 });
-    }
-
-    return Response.json({
-        id: fileKey,
-        creationTime: Date.now(),
-        title: songTitle,
-        artist: payload.artist ?? undefined,
-        mimeType: 'audio/mpeg',
-        uploadedAt: Date.now(),
-        file: {
-            key: fileKey,
-            url: fileUrl,
-        },
-    }, { status: 201 });
 };
