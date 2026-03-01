@@ -48,6 +48,80 @@ npm run ts <file.ts>            # node --experimental-strip-types
 - Design tokens come from **OpenProps** (`open-props`) — use `--size-*`, `--shadow-*`, etc.
 - Breakpoint mixins live in `src/styles/variables/mixins.scss`: `@include tablet`, `@include desktop`, etc.
 
+## Code Formatting Guidelines
+
+**Indentation & Comments:**
+
+- Use **4 spaces** for indentation (all files: TypeScript, JavaScript, SCSS)
+- Use **single-line comments** only: `// Comment` (never `/** */` or `/* */` for comments with only one line of content)
+
+**Function Definitions:**
+
+- **1–2 parameters**: Keep on single line `function getName(arg1: Type): Return {`
+- **3+ parameters**: Split across multiple lines with proper indentation
+
+**Function Calls:**
+
+- Multi-line formatting as needed for readability; no strict single-line rule
+
+**Control Structures (if/else, for, while, try/catch):**
+
+- Opening brace `{` on same line as keyword
+- Closing brace `}` on its own line
+- Continuations (`else`, `else if`, `catch`) on same line after closing brace
+- Multi-line blocks properly indented with 4 spaces
+
+```typescript
+if (condition) {
+    content
+} else if (other) {
+    content
+} else {
+    content
+}
+
+for (let i = 0; i < 10; i++) {
+    content
+}
+
+while (condition) {
+    content
+}
+
+do {
+    content
+} while (condition);
+
+try {
+    content
+} catch (err: unknown) {
+    content
+}
+
+switch (value) {
+    case 'a': {
+        content
+        break;
+    }
+    case 'b': {
+        content
+        break;
+    }
+    default: {
+        content
+    }
+}
+```
+
+**TypeScript:**
+
+- Never use `any` type; use proper typing (e.g., `Record<string, unknown>`, `z.ZodType`, etc.)
+- Use `unknown` in catch clauses: `catch (err: unknown) {`
+
+**Imports & Exports:**
+
+- Keep imports on single lines when possible
+
 ## Core Application
 
 The flagship feature is an **Audio to Color visualizer** (`src/pages/index.astro` + `src/pages/IndexScript.astro`). The client-side engine in `IndexScript.astro` uses the Web Audio API to extract features (energy, brightness, tempo, flux, spectral spread/flatness, bass ratio, zero-crossing rate), classifies them into 30+ moods, and generates HSL colors in real time. Supports three input modes: file upload, speaker/tab capture, and microphone.

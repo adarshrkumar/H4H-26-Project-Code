@@ -149,13 +149,44 @@
         });
     });
 
-    // "Refresh lyrics" button — always re-generates based on current energy selection
+    // "Refresh lyrics" button — generates AI lyrics based on current energy selection
     SECTION_IDS.forEach(id => {
-        document.getElementById(`lyrics-suggest-${id}`)?.addEventListener('click', () => {
+        document.getElementById(`lyrics-suggest-${id}`)?.addEventListener('click', async () => {
             const lyricsEl = document.getElementById(`lyrics-${id}`) as HTMLTextAreaElement | null;
             if (!lyricsEl) return;
+
             const selected = document.querySelector<HTMLButtonElement>(`.energy-card[data-section="${id}"].selected`);
-            lyricsEl.value = getLyricsSuggestion(id, selected?.dataset.pattern ?? 'smooth');
+            const energyValue = selected?.dataset.value ?? '';
+            const songConcept = (document.getElementById('song-concept') as HTMLInputElement | null)?.value.trim() ?? '';
+
+            lyricsEl.disabled = true;
+            const originalText = lyricsEl.value;
+            lyricsEl.value = '⟳ Generating lyrics...';
+
+            try {
+                const prompt = `Generate lyrics for the ${id} section${energyValue ? ` with ${energyValue} energy` : ''}${songConcept ? ` for a song about "${songConcept}"` : ''}. Make the lyrics poetic and fit the mood.`;
+
+                const res = await fetch('/api/lyrics', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ prompt, section: id, verses: 1, chorus: id === 'chorus' }),
+                });
+
+                if (!res.ok) {
+                    lyricsEl.value = originalText || getLyricsSuggestion(id, selected?.dataset.pattern ?? 'smooth');
+                    console.error('[IndexScript] Lyrics generation failed:', res.status);
+                } else {
+                    const data = await res.json() as { lyrics?: string };
+                    lyricsEl.value = data.lyrics ?? getLyricsSuggestion(id, selected?.dataset.pattern ?? 'smooth');
+                }
+            } catch (err) {
+                lyricsEl.value = originalText || getLyricsSuggestion(id, selected?.dataset.pattern ?? 'smooth');
+                console.error('[IndexScript] Lyrics generation error:', err);
+            } finally {
+                lyricsEl.disabled = false;
+            }
         });
     });
 
