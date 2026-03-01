@@ -1084,6 +1084,10 @@ html.is-spatial {
 
     --xr-background-material: transparent;
 
+    body {
+        background-color: transparent;
+    }
+
     .compose-page {
         --xr-background-material: translucent;
 
