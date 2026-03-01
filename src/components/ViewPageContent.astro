@@ -1,0 +1,89 @@
+---
+import '@/styles/pages/view.scss';
+import ViewScript from '@/scripts/ViewScript.astro';
+
+interface Props {
+    music: any;
+    audioUrl: string;
+    errorMessage?: string;
+}
+
+const { music, audioUrl, errorMessage } = Astro.props;
+---
+
+<div class="view-page-content">
+    <h1>Audio to Color</h1>
+
+    {errorMessage && (
+        <div class="error-message">
+            <p>⚠️ {errorMessage}</p>
+        </div>
+    )}
+
+    {music && audioUrl && (
+        <>
+            <div id="mode-tabs" class="mode-tabs">
+                <button class="tab" data-state="active" data-mode="file">File</button>
+                <button class="tab" data-mode="speaker">Speaker / Tab</button>
+                <button class="tab" data-mode="microphone">Microphone</button>
+            </div>
+
+            <div id="controls" class="controls">
+                <div id="ctrl-file" class="ctrl-panel" data-state="active">
+                    <label for="audioFile">Audio file</label>
+                    <input type="file" id="audioFile" accept="audio/*" />
+                </div>
+                <div id="ctrl-speaker" class="ctrl-panel">
+                    <button type="button" class="btn" id="speakerStartBtn">Start Capture</button>
+                    <button type="button" class="btn stop" id="speakerStopBtn" disabled>Stop</button>
+                </div>
+                <div id="ctrl-microphone" class="ctrl-panel">
+                    <button type="button" class="btn" id="micStartBtn">Start Microphone</button>
+                    <button type="button" class="btn stop" id="micStopBtn" disabled>Stop</button>
+                </div>
+            </div>
+
+            <div class="player">
+                <h2>{music.title}</h2>
+                <audio id="sourceAudio" class="player__audio" controls>
+                    <source src={audioUrl} type="audio/mpeg" />
+                    Your browser does not support the audio element.
+                </audio>
+            </div>
+
+            <canvas id="colorCanvas" class="color-canvas" width="660" height="280"></canvas>
+
+            <p id="mood" class="mood"></p>
+
+            <div id="metrics" class="metrics"></div>
+
+            <ViewScript sourceAudioUrl={audioUrl} />
+        </>
+    )}
+</div>
+
+<style>
+    .error-message {
+        padding: 16px;
+        background-color: rgba(233, 69, 96, 0.1);
+        border: 1px solid rgba(233, 69, 96, 0.3);
+        border-radius: 8px;
+        color: #e94560;
+        margin-bottom: 24px;
+    }
+
+    .player {
+        margin-bottom: 24px;
+    }
+
+    .player h2 {
+        font-size: 1.25rem;
+        margin-bottom: 12px;
+        color: #fff;
+    }
+
+    .player__audio {
+        width: 100%;
+        max-width: 400px;
+    }
+</style>
