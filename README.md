@@ -8,7 +8,7 @@ This is the main Astro application for the ATDSS Stack (Astro, TypeScript, Drizz
 
 - Node.js >= 18.0.0
 - Neon PostgreSQL account (database)
-- API keys for Better Auth, OpenAI, ElevenLabs, and UploadThing
+- API keys for OpenAI, ElevenLabs, and UploadThing
 
 ### Installation
 
@@ -29,10 +29,6 @@ Create a `.env` file with the following variables:
 ```env
 # Neon PostgreSQL (database)
 DATABASE_URL="postgresql://user:password@host/database"
-
-# Better Auth Authentication
-BETTER_AUTH_SECRET="your-secret-key"
-BETTER_AUTH_URL="http://localhost:4321"
 
 # OpenAI (for Vercel AI SDK)
 OPENAI_API_KEY="sk-..."
@@ -128,15 +124,6 @@ export const music = pgTable('music', {
 
 Query and mutate data using helpers in `src/db/helpers.ts`.
 
-## 🔐 Authentication
-
-Authentication is handled by Better Auth. Configure in your `.env`:
-
-```env
-BETTER_AUTH_SECRET="your-secret-key"
-BETTER_AUTH_URL="http://localhost:4321"
-```
-
 ## 🤖 AI Features
 
 ### Vercel AI SDK
@@ -166,8 +153,6 @@ vercel
 Make sure to set these environment variables in your Vercel project settings:
 
 - `DATABASE_URL`
-- `BETTER_AUTH_SECRET`
-- `BETTER_AUTH_URL`
 - `OPENAI_API_KEY`
 - `ELEVENLABS_API_KEY`
 - `UPLOADTHING_TOKEN`
@@ -177,7 +162,6 @@ Make sure to set these environment variables in your Vercel project settings:
 - [Astro Documentation](https://docs.astro.build)
 - [Drizzle ORM](https://orm.drizzle.team)
 - [Neon PostgreSQL](https://neon.tech/docs)
-- [Better Auth](https://www.better-auth.com/docs)
 - [Vercel AI SDK](https://sdk.vercel.ai/docs)
 - [Zod](https://zod.dev)
 

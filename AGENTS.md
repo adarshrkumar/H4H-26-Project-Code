@@ -54,4 +54,4 @@ The flagship feature is an **Audio to Color visualizer** (`src/pages/index.astro
 
 ## Required Environment Variables
 
-See `.env.example`. Minimum for local dev: `DATABASE_URL`, `OPENAI_API_KEY`. Auth (`BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`) and file storage (`UPLOADTHING_TOKEN`) are optional unless those features are exercised.
+See `.env.example`. Minimum for local dev: `DATABASE_URL`, `OPENAI_API_KEY`. File storage (`UPLOADTHING_TOKEN`) is optional unless that feature is exercised.
