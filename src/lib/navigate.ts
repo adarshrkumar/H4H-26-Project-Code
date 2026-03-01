@@ -1,3 +1,3 @@
-export function navigateTo(page: 'compose' | 'view') {
-    window.location.hash = page === 'view' ? '#/view' : '';
+export function navigateTo(_page: 'compose') {
+    window.location.hash = '';
 }

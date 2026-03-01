@@ -40,7 +40,6 @@ export default function ComposePageContent() {
                 <header className="compose-header">
                     <h1 className="compose-header__title">🎵 Compose Your Music</h1>
                     <p className="compose-header__subtitle">Express your rhythm. Shape your feeling. Build your story — your way.</p>
-                    <a href="#/view" className="btn secondary">🎨 Audio Visualizer</a>
                 </header>
 
                 {/* ── Step 1 · Mood ─────────────────────────────────── */}
