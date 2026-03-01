@@ -16,7 +16,7 @@ interface Props {
 
 const {
     pageTitle,
-    description = siteConfig.stackDescription,
+    description = siteConfig.description,
 } = Astro.props;
 
 const pageArray = Array.isArray(pageTitle) ? pageTitle : [pageTitle];
@@ -24,7 +24,7 @@ const pageArray = Array.isArray(pageTitle) ? pageTitle : [pageTitle];
 const firstElement = pageArray?.[0];
 const shouldSkipFirst =
     firstElement === '' ||
-    firstElement === siteConfig.stackName ||
+    firstElement === siteConfig.name ||
     firstElement?.toLowerCase() === 'index' ||
     firstElement?.toLowerCase() === 'home';
 
@@ -34,7 +34,7 @@ const newPageTitle = (pageArray && pageArray.length > 0 && firstElement)
         : pageArray
     : null;
 
-const title = newPageTitle ? `${newPageTitle.join(' | ')} | ${siteConfig.stackName}` : siteConfig.stackName;
+const title = (newPageTitle && newPageTitle.length > 0) ? `${newPageTitle.join(' | ')} | ${siteConfig.name}` : siteConfig.name;
 ---
 
 <!doctype html>

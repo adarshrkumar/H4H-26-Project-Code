@@ -1,6 +1,6 @@
-# ATSDC Stack Application
+# Audio to Color
 
-This is the main Astro application for the ATSDC Stack.
+Real-time audio analysis and mood-driven color visualization.
 
 ## 🚀 Quick Start
 

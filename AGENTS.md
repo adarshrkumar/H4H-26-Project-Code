@@ -25,11 +25,11 @@ npm run ts <file.ts>            # node --experimental-strip-types
 
 ## Architecture
 
-**Stack (ATSDC)**: Astro 5 + TypeScript + Convex + SCSS + Vercel AI SDK
+**Stack**: Astro 5 + TypeScript + Convex + SCSS
 
 **Rendering**: Server-side (`output: 'server'`) via `@astrojs/vercel` adapter.
 
-**Database**: Convex (real-time sync). Schema is in `convex/schema.ts` with `tracks` and `analyses` tables. Convex functions live in `convex/tracks.ts` and `convex/analyses.ts`. The HTTP client is initialized in `src/db/initialize.ts`. `drizzle.config.ts` is deprecated and can be ignored.
+**Database**: Convex (real-time sync). Schema is in `convex/schema.ts` with a `tracks` table. Convex functions (CRUD + file URL resolution) live in `convex/tracks.ts`. The HTTP client is initialized in `src/db/initialize.ts`. Zod validation schemas for the tracks API live in `src/db/validations.ts`. `drizzle.config.ts` is deprecated and can be ignored.
 
 **AI**: Exa search integration lives in `src/lib/exa-search.ts`.
 
@@ -51,7 +51,7 @@ npm run ts <file.ts>            # node --experimental-strip-types
 
 ## Core Application
 
-The flagship feature is an **Audio to Color visualizer** (`src/pages/index.astro` + `src/pages/IndexScript.astro`). The client-side engine in `IndexScript.astro` uses the Web Audio API to extract features (energy, brightness, tempo, flux, spectral spread/flatness, bass ratio, zero-crossing rate), classifies them into 30+ moods, and generates HSL colors in real time. Supports three input modes: file upload, speaker/tab capture, and microphone.
+The flagship feature is an **Audio to Color visualizer** (`src/pages/index.astro` + `src/scripts/IndexScript.astro`). The client-side engine in `IndexScript.astro` uses the Web Audio API to extract 25 audio features (energy, brightness, tempo, flux, spectral spread/flatness/contrast/rolloff, bass/sub-bass/mid/high ratios, ZCR, RMS, crest factor, dynamic range, harmonic ratio, chroma strength, dominant pitch, pitch, attack time, beat regularity, roughness, MFCC-1, Tonnetz), and renders the result as an **OKLch** color on a canvas in real time. Supports three input modes: file upload, speaker/tab capture, and microphone. File upload abstraction lives in `src/lib/uploading.ts`.
 
 ## Required Environment Variables
 

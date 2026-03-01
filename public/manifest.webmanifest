@@ -1,7 +1,7 @@
 {
-  "name": "ATSDC Stack App",
-  "short_name": "ATSDC",
-  "description": "Progressive Web App built with the ATSDC Stack",
+  "name": "Audio to Color",
+  "short_name": "AudioColor",
+  "description": "Real-time audio analysis and mood-driven color visualization",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
