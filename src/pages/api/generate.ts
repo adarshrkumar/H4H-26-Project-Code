@@ -3,11 +3,28 @@ import type { APIRoute } from 'astro';
 import { z } from 'zod';
 import { generateAndSave, GenerateAndSaveError } from '@/lib/generate-and-save';
 
+const sectionSchema = z.object({
+    sectionName:         z.string().min(1).max(100),
+    positiveLocalStyles: z.array(z.string()),
+    negativeLocalStyles: z.array(z.string()),
+    durationMs:          z.number().int().min(3000).max(120000),
+    lines:               z.array(z.string()),
+});
+
+const planSchema = z.object({
+    positiveGlobalStyles: z.array(z.string()),
+    negativeGlobalStyles: z.array(z.string()),
+    prompts:              z.array(sectionSchema),
+});
+
 const requestSchema = z.object({
-    text:         z.string().min(1, 'text is required').max(5000, 'text is too long'),
-    title:        z.string().min(1).max(255).optional(),
-    artist:       z.string().min(1).max(255).optional(),
+    text:          z.string().min(1).max(5000).optional(),
+    plan:          planSchema.optional(),
+    title:         z.string().min(1).max(255).optional(),
+    artist:        z.string().min(1).max(255).optional(),
     musicLengthMs: z.number().int().min(3000).max(240000).optional(),
+}).refine(data => data.text || data.plan, {
+    message: 'Either text or plan is required',
 });
 
 export const POST: APIRoute = async ({ request }) => {

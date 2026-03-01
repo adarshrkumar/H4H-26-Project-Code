@@ -3,8 +3,23 @@ import { Music } from '@elevenlabs/elevenlabs-js';
 import { generateCompositionPlan } from './eleven-labs';
 import { uploadFile, getFileUrl } from './uploadthing';
 
+export interface SectionPrompt {
+    sectionName: string;
+    positiveLocalStyles: string[];
+    negativeLocalStyles: string[];
+    durationMs: number;
+    lines: string[];
+}
+
+export interface CompositionPlan {
+    positiveGlobalStyles: string[];
+    negativeGlobalStyles: string[];
+    prompts: SectionPrompt[];
+}
+
 export interface GenerateAndSavePayload {
-    text: string;
+    text?: string;
+    plan?: CompositionPlan;
     title?: string;
     artist?: string;
     musicLengthMs?: number;
@@ -62,32 +77,51 @@ function isElevenLabsError(err: unknown): err is { statusCode: number; body: Rec
 }
 
 export async function generateAndSave(input: GenerateAndSavePayload): Promise<GenerateAndSaveResult> {
-    const text = input.text.trim();
-    if (!text) {
-        throw new GenerateAndSaveError('Text is required', 400);
+    if (!input.plan && !input.text?.trim()) {
+        throw new GenerateAndSaveError('Either text or plan is required', 400);
     }
 
-    // Step 1: composition plan
-    try {
-        await generateCompositionPlan(text, input.musicLengthMs);
-    } catch {
-        throw new GenerateAndSaveError('Composition plan failed', 500);
+    // Step 1: composition plan (skipped when plan is provided directly)
+    if (!input.plan) {
+        const text = input.text!.trim();
+        try {
+            await generateCompositionPlan(text, input.musicLengthMs);
+        } catch {
+            throw new GenerateAndSaveError('Composition plan failed', 500);
+        }
     }
 
     // Step 2: generate music
+    const composeInput = input.plan
+        ? {
+            compositionPlan: {
+                positiveGlobalStyles: input.plan.positiveGlobalStyles,
+                negativeGlobalStyles: input.plan.negativeGlobalStyles,
+                sections: input.plan.prompts.map(p => ({
+                    sectionName:         p.sectionName,
+                    positiveLocalStyles: p.positiveLocalStyles,
+                    negativeLocalStyles: p.negativeLocalStyles,
+                    durationMs:          p.durationMs,
+                    lines:               p.lines,
+                })),
+            },
+            outputFormat: OUTPUT_FORMAT,
+        }
+        : {
+            prompt: input.text!.trim(),
+            outputFormat: OUTPUT_FORMAT,
+            ...(input.musicLengthMs !== undefined && { musicLengthMs: input.musicLengthMs }),
+        };
+
     let audio: Buffer;
     let filename: string;
     let songTitle: string;
 
     try {
-        const result = await getMusic().composeDetailed({
-            prompt: text,
-            outputFormat: OUTPUT_FORMAT,
-            ...(input.musicLengthMs !== undefined && { musicLengthMs: input.musicLengthMs }),
-        });
+        const result = await getMusic().composeDetailed(composeInput);
         audio = result.audio;
         filename = result.filename;
-        songTitle = input.title ?? result.json.songMetadata.title ?? text.slice(0, 60);
+        songTitle = input.title ?? result.json.songMetadata.title ?? (input.text ?? '').slice(0, 60);
     } catch (err) {
         if (isElevenLabsError(err)) {
             const code = err.body?.error as string | undefined;
