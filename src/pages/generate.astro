@@ -213,18 +213,6 @@ const sections = [
                                 placeholder={s.placeholder}
                             ></textarea>
 
-                            <div class="section-block__actions">
-                                <button
-                                    class="btn generate-section-btn"
-                                    data-section={s.id}
-                                    id={`btn-${s.id}`}
-                                    type="button"
-                                >
-                                    Shape {s.name}
-                                </button>
-                            </div>
-
-                            <div class="section-block__result" id={`result-${s.id}`} hidden></div>
                         </div>
 
                     </div>
@@ -232,25 +220,19 @@ const sections = [
             </div>
         </section>
 
-        <!-- ── Step 3 · Combine ───────────────────────────── -->
+        <!-- ── Step 3 · Generate ──────────────────────────── -->
         <section class="step-card" id="step-combine">
             <div class="step-card__badge">Step 3</div>
-            <h2 class="step-card__title">Combine your story</h2>
+            <h2 class="step-card__title">Generate your song</h2>
             <p class="step-card__hint">
-                Watch your music come alive — each chapter flows into the next. See how the mood shifts visually between sections.
+                Configure your sections above, then generate your complete song in one go.
             </p>
 
-            <div class="combine-controls" id="combine-controls" hidden>
-                <button class="btn" id="play-all-btn" type="button">
-                    ▶ Play the Full Performance
-                </button>
+            <div class="combine-controls" id="combine-controls">
+                <button class="btn" id="generate-song-btn" type="button">✨ Generate Full Song</button>
             </div>
 
-            <div class="combine-list" id="combine-list"></div>
-
-            <p class="combine-empty" id="combine-empty">
-                Shape at least one section above — it will appear here as a chapter.
-            </p>
+            <div id="combine-result"></div>
         </section>
 
     </div>
