@@ -10,6 +10,7 @@ import AudioMotionAnalyzer from 'audiomotion-analyzer';
 import { METRICS } from '@/lib/metrics';
 
 export function initViewScript(): () => void {
+    const isXrTransparentView = new URLSearchParams(window.location.search).get('xr') === '1';
     // ── Audio-feature state ───────────────────────────────────────────────────
 
     const state = {
@@ -703,11 +704,11 @@ export function initViewScript(): () => void {
 
     // 4. Frequency bars — iridescent with peak hold, shimmer, tip burst
     const FREQ_BARS = [
-        { id: 'air',    label: 'AIR',   hueShift: 80 },
-        { id: 'spark',  label: 'HIGH',  hueShift: 60 },
-        { id: 'form',   label: 'MID',   hueShift: 40 },
-        { id: 'flow',   label: 'LOW',   hueShift: 20 },
-        { id: 'ground', label: 'BASS',  hueShift:  0 },
+        { id: 'air',    label: 'TREBLE/HIGH', hueShift: 80 },
+        { id: 'spark',  label: 'TREBLE',      hueShift: 60 },
+        { id: 'form',   label: 'MID',         hueShift: 40 },
+        { id: 'flow',   label: 'LOWMID',      hueShift: 20 },
+        { id: 'ground', label: 'BASS',        hueShift:  0 },
     ] as const;
 
     function drawFrequencyBars(W: number, H: number, bands: ReturnType<typeof getBands>, hue: number) {
@@ -715,15 +716,15 @@ export function initViewScript(): () => void {
         const gap     = 13;
         const rows    = FREQ_BARS.length;
         const totalH  = rows * (barH + gap) - gap;
-        const maxBarW = Math.min(W * 0.38, 300);
+        const maxBarW = Math.min(W * 0.34, 280);
         const leftX   = 14;
-        const labelW  = 38;
+        const labelW  = 92;
         const barX    = leftX + labelW + 6;
         const startY  = H - 42 - totalH;
         const nowMs   = performance.now();
         const tSec    = nowMs * 0.001;
 
-        ctx.font         = '800 10px system-ui';
+        ctx.font         = '700 9px system-ui';
         ctx.textBaseline = 'middle';
 
         for (let i = 0; i < rows; i++) {
@@ -845,6 +846,7 @@ export function initViewScript(): () => void {
     function renderFrame() {
         const W = canvas.width, H = canvas.height;
         if (W === 0 || H === 0) return;
+        ctx.clearRect(0, 0, W, H);
 
         // Feed metric graphs from raw analyser data; capture energy for beat detection
         let metricsEnergy = 0;
@@ -883,10 +885,14 @@ export function initViewScript(): () => void {
         if (beatFlashAlpha > 0) beatFlashAlpha = Math.max(0, beatFlashAlpha - 0.03);
 
         // Draw order
-        drawBackground(cx, cy, bands, hue);
+        if (!isXrTransparentView) {
+            drawBackground(cx, cy, bands, hue);
+        }
         if (!vizState.reduceMotion) {
             time += 0.016;
-            drawBeatFlash(W, H, hue);
+            if (!isXrTransparentView) {
+                drawBeatFlash(W, H, hue);
+            }
         }
         drawFrequencyBars(W, H, bands, hue);
         drawBreathingCircle(cx, cy, bands, hue);

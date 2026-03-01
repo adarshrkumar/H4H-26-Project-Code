@@ -704,3 +704,26 @@ body {
         transform: scaleY(1);
     }
 }
+
+// XR transparent mode for /view?xr=1
+body.view-xr-transparent {
+    background: transparent;
+}
+
+body.view-xr-transparent .view-scene-wrapper,
+body.view-xr-transparent .viz-page,
+body.view-xr-transparent .viz-canvas-wrap,
+body.view-xr-transparent .viz-topbar,
+body.view-xr-transparent .viz-panel {
+    background: transparent;
+}
+
+body.view-xr-transparent .viz-panel {
+    border-color: rgb(130 160 255 / 18%);
+}
+
+body.view-xr-transparent .viz-hint,
+body.view-xr-transparent .viz-sphere-label {
+    background: rgb(8 12 24 / 56%);
+    border-color: rgb(157 180 255 / 28%);
+}

@@ -10,8 +10,8 @@
         "preview": "vite preview",
         "lint:scss": "stylelint \"src/**/*.scss\"",
         "stylelint:fix": "npx stylelint \"src/**/*.scss\" --fix",
-        "spatial:run": "webspatial-builder run --manifest-url http://localhost:5173/manifest.webmanifest",
-        "spatial:build": "webspatial-builder build --manifest-url http://localhost:5173/manifest.webmanifest"
+        "spatial:run": "webspatial-builder run --manifest-url http://localhost:5173/manifest.spatial.webmanifest",
+        "spatial:build": "webspatial-builder build --manifest-url http://localhost:5173/manifest.spatial.webmanifest"
     },
     "dependencies": {
         "@ai-sdk/anthropic": "^2.0.67",

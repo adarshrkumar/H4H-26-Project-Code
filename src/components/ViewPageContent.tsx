@@ -7,11 +7,23 @@ import { METRICS } from '@/lib/metrics';
 import { VIEW_MOODS, VIEW_LAYERS } from '@/lib/config';
 import ViewScriptRunner from '@/components/ViewScriptRunner';
 import '@/styles/pages/view.scss';
+import { useEffect } from 'react';
 
 export default function ViewPageContent() {
+    const isXrTransparentView =
+        typeof window !== 'undefined' &&
+        new URLSearchParams(window.location.search).get('xr') === '1';
+
+    useEffect(() => {
+        const bodyClass = 'view-xr-transparent';
+        if (isXrTransparentView) document.body.classList.add(bodyClass);
+        else document.body.classList.remove(bodyClass);
+        return () => document.body.classList.remove(bodyClass);
+    }, [isXrTransparentView]);
+
     return (
         <div className="view-scene-wrapper">
-            <div className="view-page">
+            <div className={`view-page${isXrTransparentView ? ' view-page--xr' : ''}`}>
                 <div className="viz-page">
 
                     {/* ── Top bar ─────────────────────────────────────────── */}
@@ -162,7 +174,7 @@ export default function ViewPageContent() {
                                 <div className="viz-help-section">
                                     <p className="viz-help-heading">Canvas elements</p>
                                     <dl className="viz-help-list">
-                                        <dt>Center Circle</dt>
+                                        <dt>Center Sphere</dt>
                                         <dd>Size = overall loudness. Jagged edge = treble energy. Smooth edge = bass-heavy or quiet.</dd>
                                         <dt>Freq Bars (left)</dt>
                                         <dd>BASS at bottom → AIR at top. Bar length = energy in that range. Bright mark = recent peak.</dd>
