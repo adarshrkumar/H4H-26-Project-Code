@@ -12,7 +12,8 @@
         "stylelint:fix": "npx stylelint \"src/**/*.scss\" --fix",
         "spatial:run": "webspatial-builder run --manifest-url http://127.0.0.1:5173/manifest.spatial.webmanifest",
         "spatial:build": "webspatial-builder build --manifest-url http://127.0.0.1:5173/manifest.spatial.webmanifest",
-        "spatial:up": "sh -c 'npm run dev -- --host 127.0.0.1 --port 5173 & DEV_PID=$!; sleep 6; npm run spatial:run; wait $DEV_PID'"
+        "spatial:dev": "vite --host 127.0.0.1 --port 5173 --strictPort",
+        "spatial:up": "sh -c 'STARTED=0; if ! lsof -ti tcp:5173 -sTCP:LISTEN >/dev/null 2>&1; then npm run spatial:dev & DEV_PID=$!; STARTED=1; fi; trap \"if [ \\\"$STARTED\\\" = \\\"1\\\" ] && kill -0 $DEV_PID >/dev/null 2>&1; then kill $DEV_PID; fi\" EXIT INT TERM; sleep 6; npm run spatial:run; if [ \\\"$STARTED\\\" = \\\"1\\\" ]; then wait $DEV_PID; fi'"
     },
     "dependencies": {
         "@ai-sdk/anthropic": "^2.0.67",
