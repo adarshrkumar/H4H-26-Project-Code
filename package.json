@@ -7,7 +7,8 @@
         "dev": "next dev",
         "build": "next build",
         "start": "next start",
-        "lint": "next lint",
+        "lint": "next lint && npm run lint:scss",
+        "lint:scss": "stylelint \"src/**/*.scss\"",
         "ts": "node --experimental-strip-types",
         "test:chrome": "npx playwright test --headed --browser=chromium",
         "test:firefox": "npx playwright test --headed --browser=firefox",
@@ -46,7 +47,9 @@
         "@types/turndown": "^5.0.5",
         "drizzle-kit": "^0.31.9",
         "eslint": "^9.0.0",
-        "eslint-config-next": "^15.1.0"
+        "eslint-config-next": "^15.1.0",
+        "stylelint": "^17.4.0",
+        "stylelint-config-standard-scss": "^17.0.0"
     },
     "engines": {
         "node": ">=18.0.0"

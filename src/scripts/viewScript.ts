@@ -10,7 +10,7 @@ import { METRICS } from '@/lib/metrics';
 
 export function initViewScript(): () => void {
     const state = {
-        prevSpectrum:  null as Uint8Array | null,
+        prevSpectrum:  null as Uint8Array<ArrayBuffer> | null,
         onsetTimes:    []   as number[],
         energyHistory: []   as number[],
         energyEMA:     0,
@@ -19,7 +19,7 @@ export function initViewScript(): () => void {
 
     const ENERGY_HISTORY = 10;
 
-    function getAudioFeatures(dataArray: Uint8Array, timeDomainArray?: Uint8Array) {
+    function getAudioFeatures(dataArray: Uint8Array<ArrayBuffer>, timeDomainArray?: Uint8Array<ArrayBuffer>) {
         const N      = dataArray.length;
         const sr     = state.sampleRate;
         const fftSz  = N * 2;
@@ -338,8 +338,8 @@ export function initViewScript(): () => void {
 
     let audioContext:     AudioContext | null = null;
     let analyser:         AnalyserNode | null = null;
-    let dataArray:        Uint8Array | null = null;
-    let timeDomainArray:  Uint8Array | null = null;
+    let dataArray:        Uint8Array<ArrayBuffer> | null = null;
+    let timeDomainArray:  Uint8Array<ArrayBuffer> | null = null;
     let animationFrameId: number | null = null;
     let sourceNode:       MediaStreamAudioSourceNode | null = null;
     let bufferSource:     AudioBufferSourceNode | null = null;

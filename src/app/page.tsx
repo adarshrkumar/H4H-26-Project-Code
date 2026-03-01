@@ -6,9 +6,10 @@
 
 import type { Metadata } from 'next';
 import IndexScriptRunner from '@/components/IndexScriptRunner';
+import config from '@/lib/config';
 import '@/styles/pages/index.scss';
 
-export const metadata: Metadata = { title: 'Compose Your Music' };
+export const metadata: Metadata = { title: config.name };
 
 // ── Pure helper (server-side) ──────────────────────────────────────────────────
 
