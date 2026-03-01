@@ -271,3 +271,33 @@ h1 {
 .bar-tonnetz {
     background-color: #f9ca24;
 }
+
+// ── Spatial overrides (WebSpatial App Shell only) ─────────────────────────────
+
+html.is-spatial {
+    background-color: transparent;
+
+    --xr-background-material: transparent;
+
+    .mode-tabs {
+        --xr-background-material: thick;
+
+        position: relative;
+    }
+
+    .color-canvas {
+        --xr-background-material: translucent;
+
+        position: relative;
+
+        --xr-back: 20;
+    }
+
+    .metrics {
+        --xr-background-material: translucent;
+
+        position: relative;
+
+        --xr-back: 10;
+    }
+}
