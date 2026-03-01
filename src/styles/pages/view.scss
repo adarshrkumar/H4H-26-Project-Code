@@ -405,6 +405,13 @@ body {
     }
 }
 
+.viz-spatial-spheres {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+}
+
 #viz-am-hidden {
     position: absolute;
     width: 1px;
@@ -726,4 +733,20 @@ body.view-xr-transparent .viz-hint,
 body.view-xr-transparent .viz-sphere-label {
     background: rgb(8 12 24 / 56%);
     border-color: rgb(157 180 255 / 28%);
+}
+
+body.view-xr-transparent .viz-main {
+    grid-template-columns: 1fr;
+}
+
+body.view-xr-transparent .viz-panel--left,
+body.view-xr-transparent .viz-panel--right {
+    display: none;
+}
+
+body.view-xr-transparent .viz-hint {
+    top: 10px;
+    left: 14px;
+    transform: none;
+    text-align: left;
 }

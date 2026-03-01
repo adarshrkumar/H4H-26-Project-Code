@@ -11,6 +11,12 @@ import { METRICS } from '@/lib/metrics';
 
 export function initViewScript(): () => void {
     const isXrTransparentView = new URLSearchParams(window.location.search).get('xr') === '1';
+    type SphereLevels = {
+        bass: number;
+        lowmid: number;
+        mid: number;
+        trebleHigh: number;
+    };
     // ── Audio-feature state ───────────────────────────────────────────────────
 
     const state = {
@@ -593,7 +599,7 @@ export function initViewScript(): () => void {
         pulseRings.push({ r: minDim * 0.12, maxR: minDim * 0.92, life: 0, maxLife: 44, hue });
     }
 
-    function updateSphereLabels(bands: ReturnType<typeof getBands>) {
+    function updateSphereLabels(bands: ReturnType<typeof getBands>): SphereLevels {
         const formatPercent = (value: number) => `${Math.round(Math.max(0, Math.min(1, value)) * 100)}%`;
         const levels = {
             bass: bands.ground,
@@ -611,6 +617,8 @@ export function initViewScript(): () => void {
         if (sphereLabelEls.lowmid) sphereLabelEls.lowmid.textContent = formatPercent(levels.lowmid);
         if (sphereLabelEls.mid) sphereLabelEls.mid.textContent = formatPercent(levels.mid);
         if (sphereLabelEls.trebleHigh) sphereLabelEls.trebleHigh.textContent = formatPercent(levels.trebleHigh);
+
+        return levels;
     }
 
     // ── Drawing helpers ───────────────────────────────────────────────────────
@@ -867,7 +875,7 @@ export function initViewScript(): () => void {
             ? (COLORBLIND_MAP[currentMoodId] ?? vizState.moodHue)
             : vizState.moodHue;
         const bands = getBands();
-        updateSphereLabels(bands);
+        const levels = updateSphereLabels(bands);
 
         // Advance beat grid slot
         if (now - lastGridAdvance > GRID_SLOT_MS) {
@@ -883,6 +891,16 @@ export function initViewScript(): () => void {
             if (!vizState.reduceMotion) spawnPulseRing(cx, cy, hue);
         }
         if (beatFlashAlpha > 0) beatFlashAlpha = Math.max(0, beatFlashAlpha - 0.03);
+
+        window.dispatchEvent(new CustomEvent('viz:band-levels', {
+            detail: {
+                ...levels,
+                overall: bands.overall,
+                envelope: (levels.bass + levels.lowmid + levels.mid + levels.trebleHigh) / 4,
+                hitStrength: beatFlashAlpha,
+                timestampSec: now * 0.001,
+            },
+        }));
 
         // Draw order
         if (!isXrTransparentView) {

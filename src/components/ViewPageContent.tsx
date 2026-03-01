@@ -6,10 +6,12 @@
 import { METRICS } from '@/lib/metrics';
 import { VIEW_MOODS, VIEW_LAYERS } from '@/lib/config';
 import ViewScriptRunner from '@/components/ViewScriptRunner';
+import ViewSpatialSpheres from '@/components/ViewSpatialSpheres';
 import '@/styles/pages/view.scss';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 export default function ViewPageContent() {
+    const [hasUserInteracted, setHasUserInteracted] = useState(false);
     const isXrTransparentView =
         typeof window !== 'undefined' &&
         new URLSearchParams(window.location.search).get('xr') === '1';
@@ -20,6 +22,19 @@ export default function ViewPageContent() {
         else document.body.classList.remove(bodyClass);
         return () => document.body.classList.remove(bodyClass);
     }, [isXrTransparentView]);
+
+    useEffect(() => {
+        if (!isXrTransparentView || hasUserInteracted) return;
+
+        const markInteracted = () => setHasUserInteracted(true);
+        window.addEventListener('pointerdown', markInteracted, { once: true, passive: true });
+        window.addEventListener('keydown', markInteracted, { once: true });
+
+        return () => {
+            window.removeEventListener('pointerdown', markInteracted);
+            window.removeEventListener('keydown', markInteracted);
+        };
+    }, [isXrTransparentView, hasUserInteracted]);
 
     return (
         <div className="view-scene-wrapper">
@@ -114,9 +129,9 @@ export default function ViewPageContent() {
                                 <p className="viz-overlay__text">Choose a source above to begin</p>
                             </div>
                             <div className="viz-hint" id="vizHint">
-                                <p><strong>Sphere size</strong> = loudness &nbsp;·&nbsp; <strong>Sphere edge</strong> = smooth (bass) or jagged (treble)</p>
-                                <p><strong>Bottom dots</strong> = rhythm pattern &nbsp;·&nbsp; <strong>Left bars</strong> = frequency energy</p>
+                                <p><strong>Spheres</strong> grow with bass, lowmid, mid, treble/high.</p>
                             </div>
+                            {isXrTransparentView && hasUserInteracted ? <ViewSpatialSpheres /> : null}
                             <div className="viz-sphere-labels" aria-label="Sphere bands">
                                 <div className="viz-sphere-label" data-band="bass">
                                     <span className="viz-sphere-dot" aria-hidden="true" />
@@ -157,36 +172,14 @@ export default function ViewPageContent() {
 
                             <div className="viz-help-drop" id="vizHelpDrop">
                                 <div className="viz-help-section">
-                                    <p className="viz-help-heading">Toggles</p>
+                                    <p className="viz-help-heading">Quick guide</p>
                                     <dl className="viz-help-list">
+                                        <dt>Spheres</dt>
+                                        <dd>Each sphere matches one band: bass, lowmid, mid, treble/high.</dd>
+                                        <dt>Bars</dt>
+                                        <dd>Longer bars mean stronger energy in that band.</dd>
                                         <dt>Spark Ring</dt>
-                                        <dd>Iridescent rings burst outward from the center circle on every detected beat.</dd>
-                                        <dt>High Contrast</dt>
-                                        <dd>Boosts brightness of all colors — good for bright rooms or low-vision users.</dd>
-                                        <dt>Colorblind Mode</dt>
-                                        <dd>Shifts all colors to a deuteranopia-safe blue / orange / purple palette.</dd>
-                                        <dt>Reduce Motion</dt>
-                                        <dd>Freezes wave animations, beat flashes, and expanding rings. Beat grid and bars still react.</dd>
-                                        <dt>Smooth Mode</dt>
-                                        <dd>Slows beat detection — fewer triggers, better for calm or ambient music.</dd>
-                                    </dl>
-                                </div>
-                                <div className="viz-help-section">
-                                    <p className="viz-help-heading">Canvas elements</p>
-                                    <dl className="viz-help-list">
-                                        <dt>Center Sphere</dt>
-                                        <dd>Size = overall loudness. Jagged edge = treble energy. Smooth edge = bass-heavy or quiet.</dd>
-                                        <dt>Freq Bars (left)</dt>
-                                        <dd>BASS at bottom → AIR at top. Bar length = energy in that range. Bright mark = recent peak.</dd>
-                                        <dt>Beat Grid (bottom dots)</dt>
-                                        <dd>16 slots grouped in 4s. A glowing dot means a beat fired in that time window.</dd>
-                                    </dl>
-                                </div>
-                                <div className="viz-help-section">
-                                    <p className="viz-help-heading">Energy Layers (left panel)</p>
-                                    <dl className="viz-help-list">
-                                        <dt>Unchecking a layer</dt>
-                                        <dd>Removes that frequency band from the circle, bars, and beat detection entirely.</dd>
+                                        <dd>Pulse effect on beat hits.</dd>
                                     </dl>
                                 </div>
                             </div>
@@ -217,18 +210,22 @@ export default function ViewPageContent() {
                                 <div className="viz-pulse-preview" id="vizPulsePreview" aria-hidden="true" />
                             </div>
 
-                            <p className="viz-panel__title">Metrics</p>
-                            <div id="metrics" className="metrics">
-                                {METRICS.map(({ key, label }) => (
-                                    <div key={key} className="metric-panel">
-                                        <div className="metric-panel__header">
-                                            <span className="metric-label" data-metric={key}>{label}</span>
-                                            <span className="metric-value" id={`val-${key}`}>0.00</span>
-                                        </div>
-                                        <canvas className="metric-graph" id={`graph-${key}`} width={400} height={60} />
+                            {!isXrTransparentView ? (
+                                <>
+                                    <p className="viz-panel__title">Metrics</p>
+                                    <div id="metrics" className="metrics">
+                                        {METRICS.map(({ key, label }) => (
+                                            <div key={key} className="metric-panel">
+                                                <div className="metric-panel__header">
+                                                    <span className="metric-label" data-metric={key}>{label}</span>
+                                                    <span className="metric-value" id={`val-${key}`}>0.00</span>
+                                                </div>
+                                                <canvas className="metric-graph" id={`graph-${key}`} width={400} height={60} />
+                                            </div>
+                                        ))}
                                     </div>
-                                ))}
-                            </div>
+                                </>
+                            ) : null}
                         </aside>
 
                     </main>
