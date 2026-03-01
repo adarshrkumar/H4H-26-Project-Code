@@ -215,63 +215,112 @@
 
     document.getElementById('generate-song-btn')?.addEventListener('click', generateFullSong);
 
+    async function generateSection(sectionId: SectionId, globals: { songConcept: string; songStyle: string; mood: string }): Promise<string> {
+        const selectedEnergy = document.querySelector<HTMLButtonElement>(`.energy-card[data-section="${sectionId}"].selected`);
+        const energyValue = selectedEnergy?.dataset.value ?? '';
+        const lyrics      = (document.getElementById(`lyrics-${sectionId}`) as HTMLTextAreaElement | null)?.value.trim() ?? '';
+        const customText  = (document.getElementById(`text-${sectionId}`) as HTMLTextAreaElement | null)?.value.trim() ?? '';
+
+        const res = await fetch('/api/generate-section', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                sectionId,
+                sectionName:  SECTION_LABELS[sectionId],
+                musicalRole:  SECTION_MUSICAL_ROLE[sectionId],
+                energyValue,
+                lyrics,
+                customText,
+                songConcept:  globals.songConcept,
+                songStyle:    globals.songStyle,
+                mood:         globals.mood,
+            }),
+        });
+
+        const body = await res.json().catch(() => ({})) as Record<string, unknown>;
+        if (!res.ok) {
+            const message = typeof body.error === 'string' ? body.error : 'Generation failed.';
+            throw new Error(message);
+        }
+
+        const audioUrl = (body.file as Record<string, unknown> | undefined)?.url as string ?? '';
+        if (!audioUrl) throw new Error('No audio URL returned.');
+        return audioUrl;
+    }
+
     async function generateFullSong() {
         const btn      = document.getElementById('generate-song-btn') as HTMLButtonElement | null;
         const resultEl = document.getElementById('combine-result') as HTMLElement | null;
         if (!btn || !resultEl) return;
 
-        const prompt = buildCombinedPrompt();
+        const songConcept = (document.getElementById('song-concept') as HTMLInputElement | null)?.value.trim() ?? '';
+        const songStyle   = (document.getElementById('song-style')   as HTMLInputElement | null)?.value.trim() ?? '';
+        const globals = { songConcept, songStyle, mood: selectedMood };
 
         btn.disabled = true;
         resultEl.innerHTML = '';
         resultEl.hidden = false;
 
-        btn.textContent = '⟳ Planning your composition…';
-
-        try {
-            const res = await fetch('/api/generate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: prompt, title: 'Full Song', musicLengthMs: 240000 }),
-            });
-
-            const body = await res.json().catch(() => ({})) as Record<string, unknown>;
-
-            if (!res.ok) {
-                const message = typeof body.error === 'string' ? body.error : 'Generation failed.';
-                const suggestion = typeof body.suggestion === 'string' ? body.suggestion : undefined;
-                resultEl.innerHTML = `
-                    <div class="section-result error">
-                        <p class="section-result__error-msg">⚠️ ${message}</p>
-                        ${suggestion ? `<p class="section-result__suggestion-text">💡 ${suggestion}</p>` : ''}
-                    </div>
-                `;
-                btn.textContent = '✨ Try Again';
-                return;
-            }
-
-            const audioUrl = (body.file as Record<string, unknown> | undefined)?.url as string ?? '';
-            if (!audioUrl) throw new Error('No audio URL returned from the server.');
-
-            resultEl.innerHTML = `
-                <div class="section-result">
-                    <p class="section-result__label">Your complete song is ready — press play:</p>
-                    <audio class="section-result__audio" controls src="${audioUrl}" preload="metadata"></audio>
-                    <a class="btn secondary small section-result__download"
-                       href="${audioUrl}" download="full-song.mp3">
-                        ⬇ Download Full Song
-                    </a>
-                </div>
-            `;
-
-            btn.textContent = '✨ Regenerate Full Song';
-        } catch (err) {
-            const message = err instanceof Error ? err.message : 'Something went wrong.';
-            resultEl.innerHTML = `<div class="section-result error"><p class="section-result__error-msg">⚠️ ${message}</p></div>`;
-            btn.textContent = '✨ Try Again';
-        } finally {
-            btn.disabled = false;
+        // Set all sections to loading
+        for (const id of SECTION_IDS) {
+            const statusEl = document.getElementById(`status-${id}`);
+            if (statusEl) setStatus(statusEl, 'loading', '⟳ Generating…');
         }
+
+        btn.textContent = '⟳ Generating sections…';
+
+        const results = await Promise.allSettled(
+            SECTION_IDS.map(id => generateSection(id, globals).then(url => ({ id, url })))
+        );
+
+        let doneCount  = 0;
+        let errorCount = 0;
+
+        for (const result of results) {
+            if (result.status === 'fulfilled') {
+                const { id, url } = result.value;
+                doneCount++;
+
+                const statusEl = document.getElementById(`status-${id}`);
+                if (statusEl) setStatus(statusEl, 'done', '✓ Ready');
+                updateMapSegment(id);
+
+                const blockEl = document.getElementById(`block-${id}`);
+                if (blockEl) {
+                    const playerDiv = document.createElement('div');
+                    playerDiv.className = 'section-audio-player';
+                    playerDiv.innerHTML = `
+                        <audio class="section-result__audio" controls src="${url}" preload="metadata"></audio>
+                        <a class="btn secondary small section-result__download"
+                           href="${url}" download="${id}.mp3">⬇ Download</a>
+                    `;
+                    // Remove any existing player first
+                    blockEl.querySelector('.section-audio-player')?.remove();
+                    blockEl.appendChild(playerDiv);
+                }
+            } else {
+                const idx = results.indexOf(result);
+                const id  = SECTION_IDS[idx];
+                errorCount++;
+
+                const statusEl = document.getElementById(`status-${id}`);
+                const message  = result.reason instanceof Error ? result.reason.message : 'Error';
+                if (statusEl) setStatus(statusEl, 'error', `⚠ ${message}`);
+            }
+        }
+
+        if (errorCount === 0) {
+            resultEl.innerHTML = `<div class="section-result"><p class="section-result__label">All ${doneCount} sections generated.</p></div>`;
+            btn.textContent = '✨ Regenerate All Sections';
+        } else if (doneCount === 0) {
+            resultEl.innerHTML = `<div class="section-result error"><p class="section-result__error-msg">⚠ All sections failed to generate.</p></div>`;
+            btn.textContent = '✨ Try Again';
+        } else {
+            resultEl.innerHTML = `<div class="section-result"><p class="section-result__label">${doneCount} section(s) ready, ${errorCount} failed.</p></div>`;
+            btn.textContent = '✨ Regenerate All Sections';
+        }
+
+        btn.disabled = false;
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────
