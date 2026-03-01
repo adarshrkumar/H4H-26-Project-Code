@@ -111,7 +111,6 @@ All JSX goes through `@webspatial/react-sdk` (set via `jsxImportSource` in both 
 - `DATABASE_URL` — Neon PostgreSQL connection string
 - `BETTER_AUTH_SECRET` — BetterAuth secret key
 - `BETTER_AUTH_URL` — Server-side auth base URL
-- `NEXT_PUBLIC_BETTER_AUTH_URL` — Client-side auth base URL
 - `OPENAI_API_KEY` — for AI service (Vercel AI SDK BYOK mode)
 - `ELEVENLABS_API_KEY` — for music generation
 - `UPLOADTHING_TOKEN` — for file storage
