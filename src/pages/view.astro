@@ -46,9 +46,7 @@ import { METRICS } from '@/lib/metrics';
         {METRICS.map(({ key, label }) => (
             <div class="metric-row">
                 <span class="metric-label">{label}</span>
-                <div class="metric-track">
-                    <div class={`metric-bar bar-${key}`} id={`bar-${key}`}></div>
-                </div>
+                <canvas class="metric-graph" id={`graph-${key}`} width="200" height="40"></canvas>
                 <span class={`metric-value val-${key}`} id={`val-${key}`}>0.00</span>
             </div>
         ))}

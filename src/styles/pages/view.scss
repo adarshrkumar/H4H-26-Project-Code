@@ -239,18 +239,11 @@ h1 {
     white-space: nowrap;
 }
 
-.metric-track {
-    height: 5px;
-    background-color: #2a2a4a;
-    border-radius: 3px;
-    overflow: hidden;
-}
-
-.metric-bar {
-    height: 100%;
-    width: 0%;
-    border-radius: 3px;
-    transition: width 0.07s linear;
+.metric-graph {
+    display: block;
+    width: 100%;
+    height: 40px;
+    border-radius: 4px;
 }
 
 .metric-value {
@@ -260,41 +253,3 @@ h1 {
     text-align: right;
 }
 
-// Original
-.bar-energy     { background-color: #ff8c00; }
-.bar-brightness { background-color: #00bfff; }
-.bar-tempo      { background-color: #3ddc84; }
-.bar-flux       { background-color: #b07dff; }
-.bar-spread     { background-color: #20c8b8; }
-.bar-flatness   { background-color: #ff6eb4; }
-.bar-bassRatio  { background-color: #ff4444; }
-.bar-zcr        { background-color: #b8ff2f; }
-
-// Frequency bands
-.bar-rolloff         { background-color: #5bc8ff; }
-.bar-subBass         { background-color: #8b0000; }
-.bar-midRatio        { background-color: #ff9d3a; }
-.bar-highRatio       { background-color: #f5f0c0; }
-
-// Time-domain
-.bar-rms             { background-color: #ffb347; }
-.bar-crestFactor     { background-color: #9b59b6; }
-.bar-dynamicRange    { background-color: #1abc9c; }
-
-// Spectral structure
-.bar-spectralContrast { background-color: #f1c40f; }
-.bar-harmonicRatio    { background-color: #7dff8a; }
-
-// Tonal
-.bar-chromaStrength  { background-color: #8e44ad; }
-.bar-dominantPitch   { background-color: #e056ff; }
-.bar-pitch           { background-color: #87ceeb; }
-
-// Rhythmic / temporal
-.bar-attackTime      { background-color: #ff5e7a; }
-.bar-beatRegularity  { background-color: #00e676; }
-
-// Perceptual
-.bar-roughness       { background-color: #e67e22; }
-.bar-mfcc1           { background-color: #c39bd3; }
-.bar-tonnetz         { background-color: #f9ca24; }

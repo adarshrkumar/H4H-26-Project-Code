@@ -599,6 +599,17 @@
 
     import { METRICS } from '@/lib/metrics';
 
+    const HISTORY_LEN = 80;
+    type MetricKey = typeof METRICS[number]['key'];
+    const metricHistory = {} as Record<MetricKey, number[]>;
+    const metricCtx     = {} as Record<MetricKey, CanvasRenderingContext2D>;
+    const metricValEls  = {} as Record<MetricKey, HTMLElement>;
+    for (const { key } of METRICS) {
+        metricHistory[key] = [];
+        metricCtx[key]    = (document.getElementById(`graph-${key}`) as HTMLCanvasElement).getContext('2d')!;
+        metricValEls[key] = document.getElementById(`val-${key}`) as HTMLElement;
+    }
+
     const FRAME_INTERVAL_MS = 1000 / 60; // 60 fps cap
     let   lastFrameTime     = 0;
 
@@ -651,17 +662,68 @@
 
     function resetMetricBars() {
         for (const { key } of METRICS) {
-            (document.getElementById(`bar-${key}`) as HTMLElement).style.width = '0%';
-            (document.getElementById(`val-${key}`) as HTMLElement).textContent  = '0.00';
+            metricHistory[key] = [];
+            const ctx = metricCtx[key];
+            ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+            metricValEls[key].textContent = '0.00';
         }
     }
 
     function updateMetricBars(features: Record<string, number>) {
-        for (const { key } of METRICS) {
-            const v   = features[key] ?? 0;
-            const pct = Math.min(100, Math.round(v * 100));
-            (document.getElementById(`bar-${key}`) as HTMLElement).style.width = `${pct}%`;
-            (document.getElementById(`val-${key}`) as HTMLElement).textContent  = v.toFixed(2);
+        for (const { key, color } of METRICS) {
+            const v    = features[key] ?? 0;
+            const hist = metricHistory[key];
+            hist.push(v);
+            if (hist.length > HISTORY_LEN) hist.shift();
+
+            const ctx = metricCtx[key];
+            const W   = ctx.canvas.width;
+            const H   = ctx.canvas.height;
+
+            ctx.fillStyle = '#12121f';
+            ctx.fillRect(0, 0, W, H);
+
+            if (hist.length >= 2) {
+                const pad = 3;
+                const xStep = W / (HISTORY_LEN - 1);
+
+                // Area fill under the line
+                ctx.beginPath();
+                for (let i = 0; i < hist.length; i++) {
+                    const x = i * xStep;
+                    const y = H - pad - hist[i] * (H - pad * 2);
+                    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                }
+                ctx.lineTo((hist.length - 1) * xStep, H);
+                ctx.lineTo(0, H);
+                ctx.closePath();
+                ctx.globalAlpha = 0.15;
+                ctx.fillStyle = color;
+                ctx.fill();
+                ctx.globalAlpha = 1;
+
+                // Line
+                ctx.beginPath();
+                ctx.strokeStyle = color;
+                ctx.lineWidth   = 1.5;
+                ctx.lineJoin    = 'round';
+                for (let i = 0; i < hist.length; i++) {
+                    const x = i * xStep;
+                    const y = H - pad - hist[i] * (H - pad * 2);
+                    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+
+                // Dot at current value
+                const dotX = (hist.length - 1) * xStep;
+                const dotY = H - pad - v * (H - pad * 2);
+                ctx.beginPath();
+                ctx.arc(dotX, dotY, 2.5, 0, Math.PI * 2);
+                ctx.fillStyle = color;
+                ctx.fill();
+            }
+
+            metricValEls[key].textContent = v.toFixed(2);
         }
     }
 
