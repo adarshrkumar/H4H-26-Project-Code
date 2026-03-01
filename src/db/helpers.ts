@@ -7,6 +7,7 @@ export async function saveSong(fields: {
     title?: string;
     artist?: string;
 }) {
+    if (!db) return;
     return db
         .insert(music)
         .values({ id: fields.id, title: fields.title, artist: fields.artist, files: [] })
@@ -21,6 +22,7 @@ export async function addFileToSong(fields: {
     fileKey: string;
     fileUrl?: string;
 }) {
+    if (!db) return;
     const entry = JSON.stringify([{ fileKey: fields.fileKey, fileUrl: fields.fileUrl ?? '' }]);
     return db
         .update(music)
@@ -29,6 +31,7 @@ export async function addFileToSong(fields: {
 }
 
 export async function getSongWithFiles(musicId: string) {
+    if (!db) return null;
     const [song] = await db.select().from(music).where(eq(music.id, musicId)).limit(1);
     return song ?? null;
 }

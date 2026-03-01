@@ -6,6 +6,7 @@
     "scripts": {
         "dev": "vite",
         "dev:api": "tsx server/index.ts",
+        "dev:full": "sh -c 'npm run dev:api & API_PID=$!; trap \"if kill -0 $API_PID >/dev/null 2>&1; then kill $API_PID; fi\" EXIT INT TERM; npm run dev'",
         "build": "tsc -b && vite build",
         "preview": "vite preview",
         "lint:scss": "stylelint \"src/**/*.scss\"",
@@ -13,7 +14,7 @@
         "spatial:run": "webspatial-builder run --manifest-url http://127.0.0.1:5173/manifest.spatial.webmanifest",
         "spatial:build": "webspatial-builder build --manifest-url http://127.0.0.1:5173/manifest.spatial.webmanifest",
         "spatial:dev": "vite --host 127.0.0.1 --port 5173 --strictPort",
-        "spatial:up": "sh -c 'STARTED=0; if ! lsof -ti tcp:5173 -sTCP:LISTEN >/dev/null 2>&1; then npm run spatial:dev & DEV_PID=$!; STARTED=1; fi; trap \"if [ \\\"$STARTED\\\" = \\\"1\\\" ] && kill -0 $DEV_PID >/dev/null 2>&1; then kill $DEV_PID; fi\" EXIT INT TERM; sleep 6; npm run spatial:run; if [ \\\"$STARTED\\\" = \\\"1\\\" ]; then wait $DEV_PID; fi'"
+        "spatial:up": "sh -c 'STARTED_WEB=0; STARTED_API=0; if ! lsof -ti tcp:3001 -sTCP:LISTEN >/dev/null 2>&1; then npm run dev:api & API_PID=$!; STARTED_API=1; fi; if ! lsof -ti tcp:5173 -sTCP:LISTEN >/dev/null 2>&1; then npm run spatial:dev & WEB_PID=$!; STARTED_WEB=1; fi; trap \"if [ \\\"$STARTED_WEB\\\" = \\\"1\\\" ] && kill -0 $WEB_PID >/dev/null 2>&1; then kill $WEB_PID; fi; if [ \\\"$STARTED_API\\\" = \\\"1\\\" ] && kill -0 $API_PID >/dev/null 2>&1; then kill $API_PID; fi\" EXIT INT TERM; sleep 8; npm run spatial:run; if [ \\\"$STARTED_WEB\\\" = \\\"1\\\" ]; then wait $WEB_PID; fi'"
     },
     "dependencies": {
         "@ai-sdk/anthropic": "^2.0.67",

@@ -1,7 +1,7 @@
 import { Music } from '@elevenlabs/elevenlabs-js';
 import { generateCompositionPlan } from './eleven-labs';
 import { uploadFile, getFileUrl } from './uploadthing';
-import { saveSong, addFileToSong } from '@db/helpers';
+import { saveSong, addFileToSong } from '../db/helpers';
 
 export interface SectionPrompt {
     sectionName: string;
