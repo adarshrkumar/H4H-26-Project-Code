@@ -1,8 +1,15 @@
 import 'dotenv/config';
 import type { APIRoute } from 'astro';
 import { z } from 'zod';
-import { generateSectionPlan } from '@/lib/generate-section-plan';
+import { generateSectionPlan, type SongBlueprint } from '@/lib/generate-section-plan';
 import { generateAndSave, GenerateAndSaveError } from '@/lib/generate-and-save';
+
+const blueprintSchema = z.object({
+    key:             z.string(),
+    bpm:             z.number().int(),
+    coreInstruments: z.array(z.string()),
+    sonicCharacter:  z.string(),
+}).optional();
 
 const requestSchema = z.object({
     sectionId:   z.string().min(1).max(50),
@@ -14,6 +21,7 @@ const requestSchema = z.object({
     songConcept: z.string().max(500).default(''),
     songStyle:   z.string().max(500).default(''),
     mood:        z.string().max(200).default(''),
+    blueprint:   blueprintSchema,
 });
 
 export const POST: APIRoute = async ({ request }) => {
@@ -37,8 +45,18 @@ export const POST: APIRoute = async ({ request }) => {
         return Response.json({ error: 'Failed to generate section plan' }, { status: 500 });
     }
 
+    const blueprint = payload.blueprint as SongBlueprint | undefined;
+    const blueprintStyles = blueprint
+        ? [`key: ${blueprint.key}`, `tempo: ${blueprint.bpm} BPM`, blueprint.sonicCharacter]
+        : [];
+
     const plan = {
-        positiveGlobalStyles: [payload.mood, payload.songStyle, payload.songConcept].filter(Boolean),
+        positiveGlobalStyles: [
+            payload.mood,
+            payload.songStyle,
+            payload.songConcept,
+            ...blueprintStyles,
+        ].filter(Boolean),
         negativeGlobalStyles: [] as string[],
         prompts: [sectionPrompt],
     };
