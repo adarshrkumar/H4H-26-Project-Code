@@ -4,17 +4,17 @@ const utapi = new UTApi();
 
 // uploadFile
 export async function uploadFile(file: File) {
-    const [ fileKey ] = await utapi.uploadFiles([file]);
-    return fileKey;
+    const result = await utapi.uploadFiles([file]);
+    return result[0];
 }
 
 // uploadFileByUrl
 export async function uploadFileByUrl(url: string) {
-    const [ fileKey ] = await utapi.uploadFilesFromUrl([url]);
-    return fileKey;
+    const result = await utapi.uploadFilesFromUrl([url]);
+    return result[0];
 }
 
-// getFi eUrl
+// getFileUrl
 export function getFileUrl(fileKey: string) {
     return `https://utfs.io/f/${fileKey}`;
 }
