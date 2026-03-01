@@ -40,6 +40,12 @@
     ],
     "exclude": [
         "node_modules",
-        "dist"
+        "dist",
+        "src/app",
+        "src/scripts/viewScript.ts",
+        "src/middleware.next.ts",
+        "src/components/AuthForm.tsx",
+        "src/components/ViewScriptRunner.tsx",
+        "src/lib/auth.ts"
     ]
 }

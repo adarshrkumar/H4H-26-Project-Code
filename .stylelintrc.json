@@ -2,7 +2,7 @@
     "extends": "stylelint-config-standard-scss",
     "rules": {
         "property-no-vendor-prefix": [true, {
-            "ignoreProperties": ["backdrop-filter", "text-size-adjust"]
+            "ignoreProperties": ["-webkit-backdrop-filter", "backdrop-filter", "-webkit-text-size-adjust", "text-size-adjust"]
         }],
         "selector-class-pattern": ["^[a-z][a-z0-9-]*(__[a-z][a-z0-9-]*)?(--[a-z][a-z0-9-]*)?$", {
             "message": "Expected class selector to follow BEM (kebab-case with optional __element or --modifier)"

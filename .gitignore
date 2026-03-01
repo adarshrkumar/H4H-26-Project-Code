@@ -1,6 +1,7 @@
 # Astro build output
 dist/
 .astro/
+.next/
 
 # Dependencies
 node_modules/

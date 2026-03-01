@@ -106,7 +106,7 @@
     function detectBeat(energy: number, now: number): boolean {
         const alpha = state.smoothMode ? 0.05 : 0.1;
         energyEMA = energyEMA * (1 - alpha) + energy * alpha;
-        const threshold = 1 + 0.6 * 0.8; // fixed sensitivity
+        const threshold = 1 + 0.6 * 0.8;
         if (energy > energyEMA * threshold && energy > 0.05 && now - lastBeatTime > 250) {
             lastBeatTime = now;
             return true;
@@ -136,7 +136,7 @@
     let pulseRings: PulseRing[] = [];
 
     // ── Peak hold markers for frequency bars ──────────────────────────────────
-    const PEAK_HOLD_MS   = 1800;
+    const PEAK_HOLD_MS = 1800;
     const peakHold: { val: number; heldAt: number }[] = [
         { val: 0, heldAt: 0 }, { val: 0, heldAt: 0 }, { val: 0, heldAt: 0 },
         { val: 0, heldAt: 0 }, { val: 0, heldAt: 0 },
@@ -181,7 +181,6 @@
     function drawBreathingCircle(cx: number, cy: number, bands: ReturnType<typeof getBands>, hue: number) {
         const minDim = Math.min(cx, cy);
         const baseR  = minDim * 0.30;
-        // Dramatic size: very small when silent → very large when loud
         const r      = baseR * (0.25 + bands.overall * 0.90);
         const L      = state.highContrast ? 55 + bands.overall * 22 : 30 + bands.overall * 32;
         const lw     = (3 + bands.overall * 8) * (state.highContrast ? 1.6 : 1);
@@ -271,7 +270,7 @@
             const lum    = state.highContrast ? 58 + energy * 28 : 38 + energy * 40;
             const pk     = peakHold[i];
 
-            // Update peak hold (use real timestamps, independent of time variable)
+            // Update peak hold
             if (energy > pk.val) {
                 pk.val = energy;
                 pk.heldAt = nowMs;
@@ -345,9 +344,9 @@
 
             // Peak marker — bright vertical line at peak position
             if (pk.val > 0.01) {
-                const pkX    = barX + maxBarW * Math.min(pk.val, 1);
-                const pkA    = Math.min(1, pk.val * 2);
-                // Soft glow halo behind the marker
+                const pkX = barX + maxBarW * Math.min(pk.val, 1);
+                const pkA = Math.min(1, pk.val * 2);
+                // Soft glow halo
                 ctx.beginPath();
                 ctx.roundRect(pkX - 5, y, 9, barH, 4);
                 ctx.fillStyle = `oklch(88% 0.44 ${bHue + 60} / ${pkA * 0.28})`;
@@ -387,7 +386,7 @@
         }
     }
 
-    // 6. Beat grid — 16 dots, iridescent fills
+    // 6. Beat grid — 16 dots, larger + iridescent fills with glow
     function drawBeatGrid(W: number, H: number, hue: number) {
         const dotR     = 7;
         const spacing  = 22;
@@ -415,7 +414,7 @@
 
                 // Lit dot — iridescent radial gradient
                 const dg = ctx.createRadialGradient(dotX - dotR * 0.3, y - dotR * 0.3, 0, dotX, y, dotR);
-                dg.addColorStop(0, `oklch(${state.highContrast ? 98 : 92}% 0.52 ${hue})`);
+                dg.addColorStop(0,   `oklch(${state.highContrast ? 98 : 92}% 0.52 ${hue})`);
                 dg.addColorStop(0.6, `oklch(${state.highContrast ? 80 : 70}% 0.46 ${hue + 50})`);
                 dg.addColorStop(1,   `oklch(${state.highContrast ? 65 : 55}% 0.38 ${hue + 100})`);
                 ctx.beginPath();
@@ -673,4 +672,15 @@
     bindToggle('colorblindMode',  v => { state.colorblindMode   = v; });
     bindToggle('reduceMotion',    v => { state.reduceMotion      = v; });
     bindToggle('smoothMode',      v => { state.smoothMode        = v; });
+
+    // ── Help dropdown toggle ───────────────────────────────────────────────────
+    document.getElementById('vizHelpBtn')?.addEventListener('click', () => {
+        const drop = document.getElementById('vizHelpDrop');
+        const btn  = document.getElementById('vizHelpBtn') as HTMLButtonElement | null;
+        if (!drop || !btn) return;
+        const isOpen = drop.dataset.state === 'open';
+        drop.dataset.state = isOpen ? '' : 'open';
+        btn.setAttribute('aria-expanded', String(!isOpen));
+        btn.classList.toggle('active', !isOpen);
+    });
 </script>

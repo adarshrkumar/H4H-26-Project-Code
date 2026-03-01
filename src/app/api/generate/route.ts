@@ -1,5 +1,8 @@
-import 'dotenv/config';
-import type { APIRoute } from 'astro';
+/**
+ * POST /api/generate
+ * Converted from src/pages/api/generate.ts (Astro APIRoute → Next.js route handler).
+ */
+
 import { z } from 'zod';
 import { generateAndSave, GenerateAndSaveError } from '@/lib/generate-and-save';
 
@@ -27,7 +30,7 @@ const requestSchema = z.object({
     message: 'Either text or plan is required',
 });
 
-export const POST: APIRoute = async ({ request }) => {
+export async function POST(request: Request) {
     let payload: z.infer<typeof requestSchema>;
 
     try {
@@ -53,4 +56,4 @@ export const POST: APIRoute = async ({ request }) => {
         console.error('[api/generate]', err);
         return Response.json({ error: 'Failed to generate and save' }, { status: 500 });
     }
-};
+}

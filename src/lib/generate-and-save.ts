@@ -1,4 +1,3 @@
-import 'dotenv/config';
 import { Music } from '@elevenlabs/elevenlabs-js';
 import { generateCompositionPlan } from './eleven-labs';
 import { uploadFile, getFileUrl } from './uploadthing';
@@ -59,9 +58,7 @@ const OUTPUT_FORMAT = 'mp3_44100_128' as const;
 let _music: Music | null = null;
 function getMusic(): Music {
     if (!_music) {
-        const apiKey =
-            (import.meta as unknown as { env: Record<string, string> }).env?.ELEVENLABS_API_KEY ??
-            process.env.ELEVENLABS_API_KEY;
+        const apiKey = process.env.ELEVENLABS_API_KEY;
         console.log('[generate-and-save] ElevenLabs API key present:', !!apiKey);
         _music = new Music({ apiKey });
     }
@@ -164,6 +161,9 @@ export async function generateAndSave(input: GenerateAndSavePayload): Promise<Ge
         const file = new File([new Uint8Array(audio)], filename, { type: 'audio/mpeg' });
         const uploaded = await uploadFile(file);
         console.log('[generate-and-save] step 3: upload result', JSON.stringify(uploaded));
+        if (uploaded.error) {
+            throw new Error(`UploadThing error: ${uploaded.error.code} — ${uploaded.error.message}`);
+        }
         fileKey = uploaded.data?.key ?? '';
         fileUrl = fileKey ? getFileUrl(fileKey) : undefined;
         console.log('[generate-and-save] step 3: fileKey:', fileKey, 'fileUrl:', fileUrl);
@@ -172,13 +172,13 @@ export async function generateAndSave(input: GenerateAndSavePayload): Promise<Ge
         throw new GenerateAndSaveError('Failed to upload audio', 500);
     }
 
-    // Step 4: persist to Convex
-    console.log('[generate-and-save] step 4: saving to Convex');
+    // Step 4: persist to Neon
+    console.log('[generate-and-save] step 4: saving to Neon');
     try {
         await saveTrack({ id: fileKey, title: songTitle, artist: input.artist, mimeType: 'audio/mpeg', fileKey, fileUrl });
-        console.log('[generate-and-save] step 4: Convex save done');
+        console.log('[generate-and-save] step 4: Neon save done');
     } catch (err) {
-        console.error('[generate-and-save] step 4: Convex insert failed', err);
+        console.error('[generate-and-save] step 4: Neon insert failed', err);
     }
 
     return {

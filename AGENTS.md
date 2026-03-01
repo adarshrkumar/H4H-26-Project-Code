@@ -1,37 +1,72 @@
-# CLAUDE.md
+# AGENTS.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Commands
 
 ```bash
-# Development (run both simultaneously)
-npm run dev          # Astro dev server on port 4321
-npm run convex       # Convex backend dev server
+# Development
+npm run dev          # Next.js dev server on port 3000
 
-# Build & Check
-npm run build        # type-check + build (no SCSS lint)
-npm run check        # type-check + stylelint + build (full CI check)
-npm run stylelint:fix  # Auto-fix SCSS lint issues
+# Build & Deploy
+npm run build        # Next.js production build
+npm run start        # Start production server
+
+# Linting
+npm run lint         # next lint + stylelint (full check)
+npm run lint:scss    # Stylelint only (src/**/*.scss)
 
 # Testing (Playwright E2E)
-npm run test                    # All browsers
-npm run test:chrome             # Chromium headed
-npm run test:nopause:chrome     # Chromium headless (single test file)
+npm run test         # All browsers
+npm run test:chrome  # Chromium headed
+npm run test:firefox # Firefox headed
+npm run test:safari  # WebKit headed
 
 # One-off TypeScript execution
-npm run ts <file.ts>            # node --experimental-strip-types
+npm run ts <file.ts> # node --experimental-strip-types
 ```
 
 ## Architecture
 
-**Stack**: Astro 5 + TypeScript + Convex + SCSS
+**Stack**: Next.js 15 + React 19 + TypeScript + SCSS + Drizzle ORM + Neon PostgreSQL + BetterAuth + ElevenLabs + UploadThing + Vercel AI SDK
 
-**Rendering**: Server-side (`output: 'server'`) via `@astrojs/vercel` adapter.
+**Rendering**: App Router (`src/app/`), Server Components by default. Client components opt in with `'use client'`.
 
-**Database**: Convex (real-time sync). Schema is in `convex/schema.ts` with a `tracks` table. Convex functions (CRUD + file URL resolution) live in `convex/tracks.ts`. The HTTP client is initialized in `src/db/initialize.ts`. Zod validation schemas for the tracks API live in `src/db/validations.ts`. `drizzle.config.ts` is deprecated and can be ignored.
+**Database**: Drizzle ORM + Neon PostgreSQL. App schema in `src/db/schema.ts` (`music` table: id, title, artist, mimeType, fileKey, fileUrl, uploadedAt). Auth schema in `src/db/auth-schema.ts` (user/session/account/verification tables). DB client in `src/db/initialize.ts`. CRUD helpers in `src/db/helpers.ts` (`saveTrack`).
 
-**AI**: Exa search integration lives in `src/lib/exa-search.ts`.
+**Auth**: BetterAuth with Drizzle adapter (emailAndPassword enabled).
+
+- `src/lib/auth.ts` — server auth instance
+- `src/lib/auth-client.ts` — client-side `authClient` (`createAuthClient`, uses `NEXT_PUBLIC_BETTER_AUTH_URL`)
+- `src/app/api/auth/[...all]/route.ts` — catch-all GET + POST handler
+- `src/app/auth/page.tsx` — login / sign-up page
+- `src/components/AuthForm.tsx` — client component (tabs: log in / sign up)
+- `src/middleware.ts` — minimal Next.js Edge Middleware (extend here for route protection)
+
+**AI / Music Generation**:
+
+- `src/lib/ai-service.ts` — Vercel AI SDK gateway wrapper (`generate`, `chat`, `stream`, `structured`). Uses `openai/gpt-4.1-mini` by default via `@ai-sdk/gateway`.
+- `src/lib/config.ts` — app config (name: `'Huephonic'`, AI model, system prompt).
+- `src/lib/eleven-labs.ts` — ElevenLabs music generation (`generateCompositionPlan`, `generateMusic`).
+- `src/lib/generate-section-plan.ts` — per-section musical plans (`generateSongBlueprint`, `generateSectionPlan`).
+- `src/lib/generate-and-save.ts` — end-to-end pipeline: composition plan → ElevenLabs → UploadThing → Neon.
+- API routes: `src/app/api/generate/route.ts`, `src/app/api/generate-blueprint/route.ts`, `src/app/api/generate-section/route.ts`.
+
+**File Storage**: UploadThing (`src/lib/uploadthing.ts`) — `uploadFile`, `uploadFileByUrl`, `getFileUrl`, `deleteFile`, `listFiles`.
+
+## File Map
+
+| Path | Description |
+| --- | --- |
+| `src/app/layout.tsx` | Root layout — HTML shell, global SCSS, metadata |
+| `src/app/page.tsx` | Compose page (Server Component + `IndexScriptRunner`) |
+| `src/app/view/page.tsx` | Huephonic audio visualizer (Server Component + `ViewScriptRunner`) |
+| `src/app/auth/page.tsx` | Login / sign-up page |
+| `src/components/AuthForm.tsx` | Login/signup client form |
+| `src/components/IndexScriptRunner.tsx` | `'use client'` runner for compose page |
+| `src/components/ViewScriptRunner.tsx` | `'use client'` runner for audio page |
+| `src/scripts/indexScript.ts` | `initIndexScript()` — all compose-page DOM/fetch logic |
+| `src/scripts/viewScript.ts` | `initViewScript()` — Web Audio pipeline, returns cleanup fn |
 
 **Key path aliases** (from `tsconfig.json`):
 
@@ -42,17 +77,29 @@ npm run ts <file.ts>            # node --experimental-strip-types
 
 ## SCSS Conventions
 
-- **No inline `<style>` tags** in Astro components. All styles go in `src/styles/`.
-- **No utility classes** (Tailwind-style). Use semantic class names.
+- **No inline `style` props** in components. All styles go in `src/styles/`.
+- **No utility classes** (Tailwind-style). Use semantic BEM class names.
 - **Data attributes** for variants: `data-variant="primary"`, `data-size="sm"`, etc.
-- Global SCSS variables from `src/styles/variables/globals.scss` are **auto-injected** into every file via `astro.config.mjs` (`additionalData`). Do not import them manually.
+- Global SCSS variables/mixins from `src/styles/variables/` are **auto-injected** into every file via `next.config.ts` (`sassOptions.additionalData`). Do not import them manually.
 - Design tokens come from **OpenProps** (`open-props`) — use `--size-*`, `--shadow-*`, etc.
-- Breakpoint mixins live in `src/styles/variables/mixins.scss`: `@include tablet`, `@include desktop`, etc.
+- Linting: `npm run lint:scss` (stylelint with `stylelint-config-standard-scss`, BEM pattern enforced).
 
 ## Core Application
 
-The flagship feature is an **Audio to Color visualizer** (`src/pages/index.astro` + `src/scripts/IndexScript.astro`). The client-side engine in `IndexScript.astro` uses the Web Audio API to extract 25 audio features (energy, brightness, tempo, flux, spectral spread/flatness/contrast/rolloff, bass/sub-bass/mid/high ratios, ZCR, RMS, crest factor, dynamic range, harmonic ratio, chroma strength, dominant pitch, pitch, attack time, beat regularity, roughness, MFCC-1, Tonnetz), and renders the result as an **OKLch** color on a canvas in real time. Supports three input modes: file upload, speaker/tab capture, and microphone. File upload abstraction lives in `src/lib/uploading.ts`.
+**Huephonic** (`/view`) — Audio-to-color visualizer. The Web Audio API engine extracts 25 audio features (energy, brightness, tempo, flux, spectral spread/flatness/contrast/rolloff, bass/sub-bass/mid/high ratios, ZCR, RMS, crest factor, dynamic range, harmonic ratio, chroma strength, dominant pitch, pitch, attack time, beat regularity, roughness, MFCC-1, Tonnetz) and renders them as real-time metric graphs. Three input modes: file upload, speaker/tab capture, microphone.
+
+**Compose** (`/`) — AI-driven music generation. User describes mood/concept → GPT-4.1-mini generates a song blueprint and per-section plans → ElevenLabs `composeDetailed` generates audio → UploadThing stores the file → Neon persists the track record.
 
 ## Required Environment Variables
 
-See `.env.example`. Minimum for local dev: `PUBLIC_CONVEX_URL`, `OPENAI_API_KEY`. Auth (`BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`) and search (`EXA_API_KEY`) are optional unless those features are exercised.
+- `DATABASE_URL` — Neon PostgreSQL connection string
+- `BETTER_AUTH_SECRET` — BetterAuth secret key
+- `BETTER_AUTH_URL` — Server-side auth base URL
+- `NEXT_PUBLIC_BETTER_AUTH_URL` — Client-side auth base URL
+- `OPENAI_API_KEY` — for AI service (Vercel AI SDK BYOK mode)
+- `ELEVENLABS_API_KEY` — for music generation
+- `UPLOADTHING_TOKEN` — for file storage
+
+Optional:
+
+- `VERCEL_API_KEY` — switches AI gateway from BYOK to managed Vercel AI Gateway

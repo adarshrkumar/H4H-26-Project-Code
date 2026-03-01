@@ -1,6 +1,5 @@
-import { convex } from './initialize';
-import { api } from '../../convex/_generated/api';
-import type { Id } from '../../convex/_generated/dataModel';
+import { db } from './initialize';
+import { music } from './schema';
 
 export async function saveTrack(fields: {
     id: string;
@@ -10,30 +9,24 @@ export async function saveTrack(fields: {
     fileKey?: string;
     fileUrl?: string;
 }) {
-    return await convex.mutation(api.music.createMusic, {
-        id: fields.id,
-        title: fields.title,
-        artist: fields.artist,
-        mimeType: fields.mimeType,
-        ...(fields.fileKey && fields.fileUrl
-            ? { file: { key: fields.fileKey, url: fields.fileUrl } }
-            : {}),
-    });
-}
-
-export async function updateRecording(
-    id: Id<'music'>,
-    fields: {
-        title?: string;
-        fileKey?: string;
-        fileUrl?: string;
-    }
-) {
-    return await convex.mutation(api.music.updateMusic, {
-        id,
-        title: fields.title,
-        file: fields.fileKey && fields.fileUrl
-            ? { key: fields.fileKey, url: fields.fileUrl }
-            : undefined,
-    });
+    return await db
+        .insert(music)
+        .values({
+            id:       fields.id,
+            title:    fields.title,
+            artist:   fields.artist,
+            mimeType: fields.mimeType,
+            fileKey:  fields.fileKey,
+            fileUrl:  fields.fileUrl,
+        })
+        .onConflictDoUpdate({
+            target: music.id,
+            set: {
+                title:    fields.title,
+                artist:   fields.artist,
+                mimeType: fields.mimeType,
+                fileKey:  fields.fileKey,
+                fileUrl:  fields.fileUrl,
+            },
+        });
 }

@@ -1,6 +1,6 @@
 export default {
-    name: 'Audio to Color',
-    shortName: 'AudioColor',
+    name: 'Huephonic',
+    shortName: 'Huephonic',
     description: 'Real-time audio analysis and mood-driven color visualization',
     ai: {
         defaultModel: 'openai/gpt-4.1-mini',
