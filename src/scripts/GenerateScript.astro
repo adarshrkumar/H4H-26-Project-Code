@@ -9,23 +9,7 @@
         verse2: 'Verse 2', bridge: 'Bridge', outro: 'Outro',
     };
 
-    const SECTION_ICONS: Record<SectionId, string> = {
-        intro: '🎬', verse1: '📖', chorus: '🎆',
-        verse2: '📗', bridge: '🌉', outro: '🌅',
-    };
-
-    // Duration per section (ms). Total ≈ 2:32, within the 2:30–4:00 target.
-    const SECTION_DURATIONS: Record<SectionId, number> = {
-        intro:  22000,
-        verse1: 30000,
-        chorus: 28000,
-        verse2: 30000,
-        bridge: 20000,
-        outro:  22000,
-    };
-
-    // Explicit structural role injected into every prompt so ElevenLabs knows
-    // exactly what kind of section it is composing.
+    // Explicit structural role injected into the combined prompt.
     const SECTION_MUSICAL_ROLE: Record<SectionId, string> = {
         intro:  'INTRO/OPENING: establish the mood and musical theme gradually, build anticipation, do NOT reach full chorus energy yet — hint at what is coming',
         verse1: 'VERSE 1: melodic foundation, moderate and steady energy, storytelling feel, build tension toward the chorus',
@@ -36,7 +20,6 @@
     };
 
     // Pre-written lyrics per energy pattern × section.
-    // Auto-populated when user picks an energy card; fully editable.
     const LYRICS_BY_ENERGY: Record<string, Record<SectionId, string>> = {
         rise: {
             intro:  'Something stirs in the silence\nA feeling starts to rise\nThe story opens slowly\nOpening tired eyes',
@@ -99,23 +82,6 @@
     let selectedMood = '';
     let selectedMoodColor = '#e94560';
 
-    interface SectionResult {
-        sectionId: SectionId;
-        title: string;
-        audioUrl: string;
-        energyPattern: string;
-        energyLabel: string;
-        energyValue: string;
-        customText: string;
-        lyrics: string;
-        moodColor: string;
-    }
-
-    const generatedSections = new Map<SectionId, SectionResult>();
-
-    let playAllQueue: HTMLAudioElement[] = [];
-    let playAllIndex = 0;
-
     // ── CSS variable helpers ───────────────────────────────────────────────────
 
     function setMoodColor(color: string) {
@@ -140,11 +106,6 @@
             selectedMood = btn.dataset.mood ?? '';
             selectedMoodColor = color;
             setMoodColor(color);
-
-            // Propagate mood color to all energy-grid rhythm bars in sections
-            document.querySelectorAll<HTMLElement>('.energy-card .rhythm-viz span').forEach(span => {
-                // Color is driven via CSS var(--mood-color), no JS needed
-            });
         });
     });
 
@@ -152,7 +113,7 @@
 
     document.querySelectorAll<HTMLButtonElement>('.energy-card').forEach(card => {
         card.addEventListener('click', () => {
-            const sectionId = card.dataset.section;
+            const sectionId = card.dataset.section as SectionId;
             // Deselect all others in this section
             document.querySelectorAll<HTMLButtonElement>(`.energy-card[data-section="${sectionId}"]`).forEach(c => {
                 c.classList.remove('selected');
@@ -165,10 +126,24 @@
                 card.setAttribute('aria-pressed', 'true');
 
                 // Auto-fill lyrics if the textarea is still empty
-                const sectionId = card.dataset.section as SectionId;
-                const lyricsEl  = document.getElementById(`lyrics-${sectionId}`) as HTMLTextAreaElement | null;
+                const lyricsEl = document.getElementById(`lyrics-${sectionId}`) as HTMLTextAreaElement | null;
                 if (lyricsEl && !lyricsEl.value.trim()) {
                     lyricsEl.value = getLyricsSuggestion(sectionId, card.dataset.pattern ?? 'smooth');
+                }
+
+                // Mark section as configured in the map and status
+                updateMapSegment(sectionId);
+                const statusEl = document.getElementById(`status-${sectionId}`);
+                if (statusEl) setStatus(statusEl, 'done', '✓ Configured');
+            } else {
+                // If deselected and no custom text/lyrics, reset status
+                const customText = (document.getElementById(`text-${sectionId}`) as HTMLTextAreaElement | null)?.value.trim();
+                const lyrics     = (document.getElementById(`lyrics-${sectionId}`) as HTMLTextAreaElement | null)?.value.trim();
+                if (!customText && !lyrics) {
+                    const statusEl = document.getElementById(`status-${sectionId}`);
+                    if (statusEl) setStatus(statusEl, 'idle', '○ Not yet shaped');
+                    const seg = document.getElementById(`map-${sectionId}`);
+                    if (seg) delete seg.dataset.state;
                 }
             }
         });
@@ -184,115 +159,61 @@
         });
     });
 
-    // ── Song-context prompt builder ────────────────────────────────────────────
-    //
-    // Every section gets the full song identity so ElevenLabs generates them
-    // with a consistent key, tempo, and instrumentation.
+    // ── Combined prompt builder ────────────────────────────────────────────────
 
-    function buildSectionPrompt(
-        sectionId: SectionId,
-        energyValue: string,
-        customText: string,
-        lyrics: string,
-    ): string {
-        const idx   = SECTION_IDS.indexOf(sectionId);
-        const label = SECTION_LABELS[sectionId];
-
+    function buildCombinedPrompt(): string {
         const concept = (document.getElementById('song-concept') as HTMLInputElement | null)?.value.trim();
         const style   = (document.getElementById('song-style')   as HTMLInputElement | null)?.value.trim();
 
         const parts: string[] = [];
 
-        // 1. Song-wide identity shared by every section — locks in key, tempo, genre
+        // Song-wide identity — locks in key, tempo, genre for the whole track
         const identity: string[] = [];
         if (selectedMood) identity.push(selectedMood);
         if (style)        identity.push(style);
         if (concept)      identity.push(`song theme: ${concept}`);
-        identity.push('consistent musical key, BPM, timbre, and instrumentation across the entire song');
+        identity.push('consistent musical key, BPM, timbre, and instrumentation throughout the entire song');
         parts.push(identity.join(', '));
 
-        // 2. Full song structure so the model understands the overall arc
+        // Full structure overview
         const structure = SECTION_IDS.map(id => SECTION_LABELS[id]).join(' → ');
-        parts.push(`full song structure: ${structure}`);
+        parts.push(`compose a complete song with this structure: ${structure}`);
 
-        // 3. All previously generated sections as musical reference
-        const prevDescriptions: string[] = [];
+        // Per-section details
         for (const id of SECTION_IDS) {
-            if (id === sectionId) break;
-            const prev = generatedSections.get(id);
-            if (prev) {
-                let desc = `${SECTION_LABELS[id]}: ${prev.energyLabel}`;
-                if (prev.lyrics) desc += ` — lyrics: "${prev.lyrics.split('\n')[0]}…"`;
-                prevDescriptions.push(desc);
-            }
+            const selectedEnergy = document.querySelector<HTMLButtonElement>(
+                `.energy-card[data-section="${id}"].selected`
+            );
+            const energyValue = selectedEnergy?.dataset.value ?? '';
+            const customText  = (document.getElementById(`text-${id}`) as HTMLTextAreaElement | null)?.value.trim() ?? '';
+            const lyrics      = (document.getElementById(`lyrics-${id}`) as HTMLTextAreaElement | null)?.value.trim() ?? '';
+
+            const sectionParts: string[] = [SECTION_MUSICAL_ROLE[id]];
+            if (energyValue) sectionParts.push(energyValue);
+            if (customText)  sectionParts.push(customText);
+            if (lyrics)      sectionParts.push(`vocals/lyrics: "${lyrics}"`);
+
+            parts.push(`[${SECTION_LABELS[id]}] ${sectionParts.join(', ')}`);
         }
-        if (prevDescriptions.length > 0) {
-            parts.push(`sections already created: ${prevDescriptions.join('; ')}`);
-        }
-
-        // 4. Structural role — tells ElevenLabs what type of section this is
-        parts.push(SECTION_MUSICAL_ROLE[sectionId]);
-
-        // 5. Energy + custom description for this section
-        const current: string[] = [];
-        if (energyValue) current.push(energyValue);
-        if (customText)  current.push(customText);
-        if (current.length) parts.push(current.join(', '));
-
-        // 6. Lyrics embedded directly so the music matches the vocal content
-        if (lyrics) parts.push(`lyrics: "${lyrics}"`);
-
-        // 7. Transition instructions to neighbouring sections
-        const prevId = idx > 0 ? SECTION_IDS[idx - 1] : null;
-        const nextId = idx < SECTION_IDS.length - 1 ? SECTION_IDS[idx + 1] : null;
-        const flow: string[] = [];
-        if (prevId) flow.push(`flows naturally from the ${SECTION_LABELS[prevId]}`);
-        if (nextId) flow.push(`transitions smoothly into the ${SECTION_LABELS[nextId]}`);
-        if (flow.length) parts.push(flow.join(' and '));
 
         return parts.join('. ');
     }
 
-    // ── Per-section generation ─────────────────────────────────────────────────
+    // ── Generate Full Song ─────────────────────────────────────────────────────
 
-    SECTION_IDS.forEach(id => {
-        document.getElementById(`btn-${id}`)?.addEventListener('click', () => generateSection(id));
-    });
+    document.getElementById('generate-song-btn')?.addEventListener('click', generateFullSong);
 
-    async function generateSection(sectionId: SectionId) {
-        const label    = SECTION_LABELS[sectionId];
-        const textarea = document.getElementById(`text-${sectionId}`) as HTMLTextAreaElement | null;
-        const btn      = document.getElementById(`btn-${sectionId}`) as HTMLButtonElement | null;
-        const statusEl = document.getElementById(`status-${sectionId}`) as HTMLElement | null;
-        const resultEl = document.getElementById(`result-${sectionId}`) as HTMLElement | null;
-        const block    = document.getElementById(`block-${sectionId}`);
+    async function generateFullSong() {
+        const btn      = document.getElementById('generate-song-btn') as HTMLButtonElement | null;
+        const resultEl = document.getElementById('combine-result') as HTMLElement | null;
+        if (!btn || !resultEl) return;
 
-        if (!btn || !statusEl || !resultEl) return;
+        const prompt = buildCombinedPrompt();
 
-        const selectedEnergy = document.querySelector<HTMLButtonElement>(
-            `.energy-card[data-section="${sectionId}"].selected`
-        );
-        const energyValue   = selectedEnergy?.dataset.value ?? '';
-        const energyPattern = selectedEnergy?.dataset.pattern ?? 'smooth';
-        const energyLabel   = selectedEnergy?.querySelector('.energy-card__label')?.textContent?.trim() ?? '';
-        const customText    = textarea?.value.trim() ?? '';
-        const lyricsEl      = document.getElementById(`lyrics-${sectionId}`) as HTMLTextAreaElement | null;
-        const lyrics        = lyricsEl?.value.trim() ?? '';
-
-        if (!selectedMood && !energyValue && !customText) {
-            setStatus(statusEl, 'error', '! Choose a mood or energy style first');
-            return;
-        }
-
-        // Build a context-rich prompt: song DNA + structural role + lyrics + transitions
-        const prompt = buildSectionPrompt(sectionId, energyValue, customText, lyrics);
-
-        // Set loading
         btn.disabled = true;
-        btn.textContent = `Shaping ${label}…`;
-        setStatus(statusEl, 'loading', '⟳ Generating…');
-        resultEl.hidden = true;
-        block?.classList.remove('just-done');
+        btn.textContent = '⟳ Composing your full song…';
+        resultEl.innerHTML = '';
+        resultEl.hidden = false;
 
         try {
             const res = await fetch('/api/generate', {
@@ -300,8 +221,8 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     text: prompt,
-                    title: label,
-                    musicLengthMs: SECTION_DURATIONS[sectionId],
+                    title: 'Full Song',
+                    musicLengthMs: 240000,
                 }),
             });
 
@@ -309,9 +230,14 @@
                 const err = await res.json().catch(() => ({})) as Record<string, unknown>;
                 const message = typeof err.error === 'string' ? err.error : 'Generation failed.';
                 const suggestion = typeof err.suggestion === 'string' ? err.suggestion : undefined;
-                renderError(resultEl, message, suggestion, sectionId);
-                setStatus(statusEl, 'error', '✗ Error — see below');
-                btn.textContent = `Try ${label} Again`;
+                resultEl.innerHTML = `
+                    <div class="section-result error">
+                        <p class="section-result__error-msg">⚠️ ${message}</p>
+                        ${suggestion ? `<p class="section-result__suggestion-text">💡 ${suggestion}</p>` : ''}
+                    </div>
+                `;
+                btn.textContent = '✨ Try Again';
+                btn.disabled = false;
                 return;
             }
 
@@ -324,188 +250,36 @@
             const audioUrl = data.file?.url ?? '';
             if (!audioUrl) throw new Error('No audio URL returned from the server.');
 
-            // Success
-            setStatus(statusEl, 'done', '✓ Shaped');
-            renderAudio(resultEl, audioUrl, data.title ?? label);
-            updateMapSegment(sectionId);
+            resultEl.innerHTML = `
+                <div class="section-result">
+                    <p class="section-result__label">Your complete song is ready — press play:</p>
+                    <audio class="section-result__audio" controls src="${audioUrl}" preload="metadata"></audio>
+                    <a class="btn secondary small section-result__download"
+                       href="${audioUrl}" download="full-song.mp3">
+                        ⬇ Download Full Song
+                    </a>
+                </div>
+            `;
 
-            generatedSections.set(sectionId, {
-                sectionId,
-                title: data.title ?? label,
-                audioUrl,
-                energyPattern,
-                energyLabel,
-                energyValue,
-                customText,
-                lyrics,
-                moodColor: selectedMoodColor,
-            });
-            updateCombineList();
-
-            // Pulse glow animation on the card
-            block?.classList.add('just-done');
-            setTimeout(() => block?.classList.remove('just-done'), 1400);
-
-            btn.textContent = `Reshape ${label}`;
+            btn.textContent = '✨ Regenerate Full Song';
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Something went wrong.';
-            renderError(resultEl, message, undefined, sectionId);
-            setStatus(statusEl, 'error', '✗ Error');
-            btn.textContent = `Try ${label} Again`;
+            resultEl.innerHTML = `<div class="section-result error"><p class="section-result__error-msg">⚠️ ${message}</p></div>`;
+            btn.textContent = '✨ Try Again';
         } finally {
             btn.disabled = false;
         }
     }
 
-    // ── Render helpers ─────────────────────────────────────────────────────────
+    // ── Helpers ────────────────────────────────────────────────────────────────
 
     function setStatus(el: HTMLElement, state: 'idle' | 'loading' | 'done' | 'error', text: string) {
         el.dataset.state = state;
         el.textContent = text;
     }
 
-    function renderAudio(container: HTMLElement, audioUrl: string, title: string) {
-        container.innerHTML = `
-            <div class="section-result">
-                <p class="section-result__label">Feel the pulse pattern — play your section:</p>
-                <audio class="section-result__audio" controls src="${audioUrl}" preload="metadata"></audio>
-                <a class="btn secondary small section-result__download"
-                   href="${audioUrl}" download="${title}.mp3">
-                    ⬇ Download
-                </a>
-            </div>
-        `;
-        container.hidden = false;
-    }
-
-    function renderError(container: HTMLElement, message: string, suggestion: string | undefined, sectionId: SectionId) {
-        const suggHtml = suggestion
-            ? `<div class="section-result__suggestion">
-                   <span class="section-result__suggestion-label">💡 Try this instead:</span>
-                   <span class="section-result__suggestion-text" id="sugg-${sectionId}">${suggestion}</span>
-                   <button class="btn secondary small" id="use-sugg-${sectionId}" type="button">Use suggestion</button>
-               </div>`
-            : '';
-        container.innerHTML = `
-            <div class="section-result error">
-                <p class="section-result__error-msg">⚠️ ${message}</p>
-                ${suggHtml}
-            </div>
-        `;
-        container.hidden = false;
-
-        if (suggestion) {
-            document.getElementById(`use-sugg-${sectionId}`)?.addEventListener('click', () => {
-                const textarea = document.getElementById(`text-${sectionId}`) as HTMLTextAreaElement | null;
-                if (textarea) textarea.value = suggestion;
-                container.hidden = true;
-                const statusEl = document.getElementById(`status-${sectionId}`);
-                if (statusEl) setStatus(statusEl, 'idle', '○ Not yet shaped');
-            });
-        }
-    }
-
-    function makeWaveformBars(count: number): string {
-        return Array.from({length: count}, (_, i) => `<span style="--i:${i}"></span>`).join('');
-    }
-
-    // ── Song map ───────────────────────────────────────────────────────────────
-
     function updateMapSegment(sectionId: SectionId) {
         const seg = document.getElementById(`map-${sectionId}`);
         if (seg) seg.dataset.state = 'done';
-    }
-
-    // ── Combine list ───────────────────────────────────────────────────────────
-
-    function updateCombineList() {
-        const list     = document.getElementById('combine-list');
-        const empty    = document.getElementById('combine-empty');
-        const controls = document.getElementById('combine-controls');
-        if (!list || !empty || !controls) return;
-
-        list.innerHTML = '';
-        let count = 0;
-
-        for (const id of SECTION_IDS) {
-            const section = generatedSections.get(id);
-            if (!section) continue;
-            count++;
-
-            const card = document.createElement('div');
-            card.className = 'chapter-card';
-            card.id = `chapter-${id}`;
-            card.dataset.section = id;
-            card.style.setProperty('--section-color', section.moodColor);
-
-            card.innerHTML = `
-                <div class="chapter-card__header">
-                    <span class="chapter-card__icon">${SECTION_ICONS[id]}</span>
-                    <div class="chapter-card__info">
-                        <span class="chapter-card__name">${SECTION_LABELS[id]}</span>
-                        ${section.energyLabel
-                            ? `<span class="chapter-card__energy">${section.energyLabel}</span>`
-                            : ''}
-                    ${section.lyrics
-                            ? `<pre class="chapter-card__lyrics">${section.lyrics}</pre>`
-                            : ''}
-                    </div>
-                    <span class="chapter-card__now-playing" aria-live="polite">▶ Now playing</span>
-                </div>
-                <div class="chapter-waveform">
-                    <div class="rhythm-viz" data-pattern="${section.energyPattern}">
-                        ${makeWaveformBars(16)}
-                    </div>
-                </div>
-                <div class="chapter-card__controls">
-                    <audio class="chapter-card__audio" controls src="${section.audioUrl}" preload="metadata"></audio>
-                </div>
-            `;
-
-            list.appendChild(card);
-        }
-
-        empty.hidden = count > 0;
-        controls.hidden = count === 0;
-    }
-
-    // ── Play All ───────────────────────────────────────────────────────────────
-
-    document.getElementById('play-all-btn')?.addEventListener('click', () => {
-        const audios = document.querySelectorAll<HTMLAudioElement>('.chapter-card__audio');
-        playAllQueue = [...audios];
-        playAllIndex = 0;
-
-        playAllQueue.forEach(a => { a.pause(); a.currentTime = 0; });
-        document.querySelectorAll('.chapter-card').forEach(c => c.removeAttribute('data-playing'));
-
-        playNextInQueue();
-    });
-
-    function playNextInQueue() {
-        if (playAllIndex >= playAllQueue.length) {
-            document.querySelectorAll('.chapter-card').forEach(c => c.removeAttribute('data-playing'));
-            return;
-        }
-
-        document.querySelectorAll('.chapter-card').forEach(c => c.removeAttribute('data-playing'));
-
-        const audio = playAllQueue[playAllIndex];
-        const card  = audio.closest<HTMLElement>('.chapter-card');
-
-        if (card) {
-            card.setAttribute('data-playing', 'true');
-            card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-
-            // Shift the whole page mood color to this chapter's mood
-            const sectionColor = card.style.getPropertyValue('--section-color');
-            if (sectionColor) setMoodColor(sectionColor);
-        }
-
-        audio.play().catch(() => {});
-        audio.addEventListener('ended', () => {
-            playAllIndex++;
-            playNextInQueue();
-        }, { once: true });
     }
 </script>
