@@ -482,6 +482,9 @@
     // ── E. Screen shake ───────────────────────────────────────────────────────
     let shakeAmt = 0;
 
+    // ── F. Beat glow (box-shadow flash) ───────────────────────────────────────
+    let glowIntensity = 0;
+
     // ── Mood system ───────────────────────────────────────────────────────────
     const moodW = { calm: 0.5, energetic: 0, sad: 0, angry: 0, dreamy: 0.5 };
 
@@ -573,9 +576,15 @@
 
         // E. Screen shake on strong beat
         if (f.energy > 0.35) shakeAmt = Math.min(8, f.energy * 12);
+
+        // F. Glow flash
+        glowIntensity = Math.min(1, glowIntensity + f.energy * 0.8 + 0.3);
     }
 
     import { METRICS } from '@/lib/metrics';
+
+    const FRAME_INTERVAL_MS = 1000 / 60; // 60 fps cap
+    let   lastFrameTime     = 0;
 
     const canvas          = document.getElementById('colorCanvas') as HTMLCanvasElement;
     const canvasCtx       = canvas.getContext('2d')!;
@@ -613,6 +622,7 @@
     function setupAnalyser() {
         analyser = audioContext!.createAnalyser();
         analyser.fftSize = 2048;
+        analyser.smoothingTimeConstant = 0.78;
         dataArray       = new Uint8Array(analyser.frequencyBinCount);
         timeDomainArray = new Uint8Array(analyser.fftSize);
     }
@@ -664,6 +674,8 @@
         rings.length         = 0;
         ptcls.length        = 0;
         shakeAmt            = 0;
+        glowIntensity       = 0;
+        canvas.style.boxShadow = 'none';
         state.energyHistory.length = 0;
         // pcmCount = 0;
         // pcmPos   = 0;
@@ -776,7 +788,7 @@
 
     micStopBtn.addEventListener('click', stopCapture);
 
-    function drawVisualization() {
+    function drawVisualization(timestamp = 0) {
         if (!analyser || (!bufferSource && !sourceNode)) {
             if (animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
             resetCanvas();
@@ -785,6 +797,9 @@
         }
 
         animationFrameId = requestAnimationFrame(drawVisualization);
+
+        if (timestamp - lastFrameTime < FRAME_INTERVAL_MS) return;
+        lastFrameTime = timestamp;
 
         analyser.getByteFrequencyData(dataArray!);
         analyser.getByteTimeDomainData(timeDomainArray!);
@@ -825,10 +840,10 @@
         const barWidth = canvas.width / NUM_HISTORY;
 
         // ── B. Live scrolling waveform (tonal color, beat-independent) ────────
-        if (timeDomainArray) {
+        if (timeDomainArray && features.energy >= 0.01) {
             let mn = 1, mx = -1;
             for (let i = 0; i < timeDomainArray.length; i++) {
-                const v = (timeDomainArray[i] - 128) / 128;
+                const v = (timeDomainArray[i] / 128) - 1;
                 if (v < mn) mn = v;
                 if (v > mx) mx = v;
             }
@@ -839,8 +854,8 @@
             for (let i = 0; i < waveHistory.length; i++) {
                 const { min, max } = waveHistory[i];
                 const x     = canvas.width - (waveHistory.length - i) * bw;
-                const yTop  = cy + max * cy * 0.85;
-                const yBot  = cy + min * cy * 0.85;
+                const yTop  = cy + max * cy * 0.62;
+                const yBot  = cy + min * cy * 0.62;
                 const alpha = Math.min(1, i / (NUM_HISTORY * 0.15)) * 0.85;
                 canvasCtx.fillStyle = `oklch(${waveColor.l}% ${waveColor.c} ${waveColor.h} / ${alpha})`;
                 canvasCtx.fillRect(x, yTop, bw + 1, Math.max(1, yBot - yTop));
@@ -878,6 +893,14 @@
         }
 
         canvasCtx.restore();
+
+        // ── F. Beat glow box-shadow ───────────────────────────────────────────
+        glowIntensity *= 0.88;
+        const spread = Math.round(glowIntensity * 40);
+        const blur   = Math.round(glowIntensity * 60);
+        canvas.style.boxShadow = glowIntensity > 0.02
+            ? `0 0 ${blur}px ${spread}px oklch(${waveColor.l}% ${waveColor.c} ${waveColor.h} / ${(glowIntensity * 0.7).toFixed(3)})`
+            : 'none';
         const { isBeat: _isBeat, ...numericFeatures } = features;
         updateMetricBars(numericFeatures);
     }
