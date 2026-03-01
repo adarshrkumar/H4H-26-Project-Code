@@ -3,7 +3,12 @@ import '@/styles/pages/view.scss';
 import ViewScript from '@/scripts/ViewScript.astro';
 
 interface Props {
-    music: any;
+    music: {
+        id: string;
+        title: string;
+        filename: string;
+        createdAt: string;
+    };
     audioUrl: string;
     errorMessage?: string;
 }

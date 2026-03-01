@@ -55,7 +55,6 @@ export const POST: APIRoute = async ({ request }) => {
 
     // Generate music via ElevenLabs
     let audio: Buffer;
-    let filename: string;
     let songTitle: string;
 
     try {
@@ -66,7 +65,6 @@ export const POST: APIRoute = async ({ request }) => {
         });
 
         audio = result.audio;
-        filename = result.filename;
         songTitle = payload.title ?? result.json.songMetadata.title ?? payload.text.slice(0, 60);
     } catch (err) {
         if (isElevenLabsError(err)) {
@@ -84,13 +82,20 @@ export const POST: APIRoute = async ({ request }) => {
 
     // Upload to UploadThing
     let fileKey: string;
-    let fileUrl: string | undefined;
+    let fileUrl: string;
 
     try {
-        const file = new File([new Uint8Array(audio)], filename, { type: 'audio/mpeg' });
+        const uploadFilename = `${songTitle.replace(/[^a-z0-9_-]/gi, '_')}.mp3`;
+        const file = new File([new Uint8Array(audio)], uploadFilename, { type: 'audio/mpeg' });
         const uploaded = await uploadFile(file);
         fileKey = (uploaded as any)?.key || (uploaded.data as any)?.key || '';
-        fileUrl = fileKey ? getFileUrl(fileKey) : undefined;
+        if (!fileKey) {
+            throw new Error('No file key returned from upload');
+        }
+        fileUrl = getFileUrl(fileKey);
+        if (!fileUrl) {
+            throw new Error('Failed to generate file URL');
+        }
     } catch (err) {
         console.error('[api/generate] UploadThing error:', err);
         return Response.json({ error: 'Failed to upload audio' }, { status: 500 });
