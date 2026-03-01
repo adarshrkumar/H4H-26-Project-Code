@@ -41,9 +41,10 @@
     "incremental": true
   },
   "include": [
-    "src/**/*",
+    ".next/types/**/*.ts",
     "next-env.d.ts",
-    ".next/types/**/*.ts"
+    "src/**/*",
+    ".next/webspatial/avp/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",
