@@ -254,10 +254,16 @@
                 <div class="section-result">
                     <p class="section-result__label">Your complete song is ready — press play:</p>
                     <audio class="section-result__audio" controls src="${audioUrl}" preload="metadata"></audio>
-                    <a class="btn secondary small section-result__download"
-                       href="${audioUrl}" download="full-song.mp3">
-                        ⬇ Download Full Song
-                    </a>
+                    <div class="section-result__actions">
+                        <a class="btn secondary small section-result__download"
+                           href="${audioUrl}" download="full-song.mp3">
+                            ⬇ Download Full Song
+                        </a>
+                        <a class="btn secondary small section-result__view"
+                           href="#/view/${data.id}">
+                            👁 View Visualization
+                        </a>
+                    </div>
                 </div>
             `;
 
