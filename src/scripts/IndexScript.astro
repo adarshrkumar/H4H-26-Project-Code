@@ -221,28 +221,20 @@
         btn.disabled = true;
         resultEl.innerHTML = '';
         resultEl.hidden = false;
-
-        // Set all sections to loading
-        for (const id of SECTION_IDS) {
-            const statusEl = document.getElementById(`status-${id}`);
-            if (statusEl) setStatus(statusEl, 'loading', '⟳ Generating…');
-        }
-
         btn.textContent = '⟳ Generating sections…';
-
-        const results = await Promise.allSettled(
-            SECTION_IDS.map(id => generateSection(id, globals).then(url => ({ id, url })))
-        );
 
         let doneCount  = 0;
         let errorCount = 0;
 
-        for (const result of results) {
-            if (result.status === 'fulfilled') {
-                const { id, url } = result.value;
+        for (const id of SECTION_IDS) {
+            const statusEl = document.getElementById(`status-${id}`);
+            if (statusEl) setStatus(statusEl, 'loading', '⟳ Generating…');
+            btn.textContent = `⟳ Generating ${SECTION_LABELS[id]}…`;
+
+            try {
+                const url = await generateSection(id, globals);
                 doneCount++;
 
-                const statusEl = document.getElementById(`status-${id}`);
                 if (statusEl) setStatus(statusEl, 'done', '✓ Ready');
                 updateMapSegment(id);
 
@@ -255,17 +247,12 @@
                         <a class="btn secondary small section-result__download"
                            href="${url}" download="${id}.mp3">⬇ Download</a>
                     `;
-                    // Remove any existing player first
                     blockEl.querySelector('.section-audio-player')?.remove();
                     blockEl.appendChild(playerDiv);
                 }
-            } else {
-                const idx = results.indexOf(result);
-                const id  = SECTION_IDS[idx];
+            } catch (err) {
                 errorCount++;
-
-                const statusEl = document.getElementById(`status-${id}`);
-                const message  = result.reason instanceof Error ? result.reason.message : 'Error';
+                const message = err instanceof Error ? err.message : 'Error';
                 if (statusEl) setStatus(statusEl, 'error', `⚠ ${message}`);
             }
         }
