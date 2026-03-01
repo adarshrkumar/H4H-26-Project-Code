@@ -75,7 +75,7 @@ export default function AuthForm() {
                         id="auth-email"
                         className="form-input"
                         type="email"
-                        autoComplete={mode === 'login' ? 'email' : 'new-email'}
+                        autoComplete="email"
                         required
                         value={email}
                         onChange={e => setEmail(e.target.value)}
@@ -85,16 +85,29 @@ export default function AuthForm() {
 
                 <div className="form-group">
                     <label className="form-label" htmlFor="auth-password">Password</label>
-                    <input
-                        id="auth-password"
-                        className="form-input"
-                        type="password"
-                        autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                        required
-                        value={password}
-                        onChange={e => setPassword(e.target.value)}
-                        placeholder={mode === 'signup' ? 'Min 8 characters' : '••••••••'}
-                    />
+                    {mode === 'login' ? (
+                        <input
+                            id="auth-password"
+                            className="form-input"
+                            type="password"
+                            autoComplete="current-password"
+                            required
+                            value={password}
+                            onChange={e => setPassword(e.target.value)}
+                            placeholder="••••••••"
+                        />
+                    ) : (
+                        <input
+                            id="auth-password"
+                            className="form-input"
+                            type="password"
+                            autoComplete="new-password"
+                            required
+                            value={password}
+                            onChange={e => setPassword(e.target.value)}
+                            placeholder="Min 8 characters"
+                        />
+                    )}
                 </div>
 
                 {error && <p className="auth-card__error">{error}</p>}

@@ -11,14 +11,6 @@ import '@/styles/pages/index.scss';
 
 export const metadata: Metadata = { title: config.name };
 
-// ── Pure helper (server-side) ──────────────────────────────────────────────────
-
-function hexBlend(fg: string, bg: string, ratio: number): string {
-    const fr = parseInt(fg.slice(1, 3), 16), fg2 = parseInt(fg.slice(3, 5), 16), fb = parseInt(fg.slice(5, 7), 16);
-    const br = parseInt(bg.slice(1, 3), 16), bg2 = parseInt(bg.slice(3, 5), 16), bb = parseInt(bg.slice(5, 7), 16);
-    return `rgb(${Math.round(fr * ratio + br * (1 - ratio))},${Math.round(fg2 * ratio + bg2 * (1 - ratio))},${Math.round(fb * ratio + bb * (1 - ratio))})`;
-}
-
 // ── Static data ────────────────────────────────────────────────────────────────
 
 const moods = [
@@ -101,11 +93,6 @@ export default function ComposePage() {
                                 data-mood={m.value}
                                 data-color={m.color}
                                 data-pulse={m.pulse}
-                                style={{
-                                    ['--btn-color' as string]:       m.color,
-                                    ['--btn-hover-bg' as string]:    hexBlend(m.color, '#11112a', 0.08),
-                                    ['--btn-selected-bg' as string]: hexBlend(m.color, '#11112a', 0.14),
-                                } as React.CSSProperties}
                                 type="button"
                                 aria-pressed="false"
                             >
@@ -113,7 +100,7 @@ export default function ComposePage() {
                                 <span className="mood-btn__label">{m.label}</span>
                                 <div className="mood-viz" aria-hidden="true">
                                     {Array.from({ length: 8 }).map((_, i) => (
-                                        <span key={i} style={{ ['--i' as string]: i } as React.CSSProperties}></span>
+                                        <span key={i}></span>
                                     ))}
                                 </div>
                             </button>
@@ -199,7 +186,7 @@ export default function ComposePage() {
                                                 <span className="energy-card__label">{opt.label}</span>
                                                 <div className="rhythm-viz" data-pattern={opt.pattern} aria-hidden="true">
                                                     {Array.from({ length: 8 }).map((_, i) => (
-                                                        <span key={i} style={{ ['--i' as string]: i } as React.CSSProperties}></span>
+                                                        <span key={i}></span>
                                                     ))}
                                                 </div>
                                                 <span className="energy-card__hint">{opt.hint}</span>
