@@ -735,8 +735,52 @@
         const avgC = lchHistory.reduce((s, v) => s + v.c, 0) / n;
         const avgH = lchHistory.reduce((s, v) => s + v.h, 0) / n;
 
-        canvasCtx.fillStyle = `oklch(${Math.round(avgL)}% ${avgC.toFixed(3)} ${Math.round(avgH)})`;
+        const bgColor = `oklch(${Math.round(avgL)}% ${avgC.toFixed(3)} ${Math.round(avgH)})`;
+        const spikeColor = `oklch(${Math.round(avgL + 10)}% ${(avgC * 1.2).toFixed(3)} ${Math.round(avgH)})`;
+
+        // ── Background ──────────────────────────────────────────────────────
+        canvasCtx.fillStyle = bgColor;
         canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // ── Draw radial spikes visualization ────────────────────────────────
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const baseRadius = 60;
+        const maxSpikeLength = 100;
+        const numSpikes = Math.min(64, dataArray!.length);
+        
+        // Draw spikes
+        canvasCtx.strokeStyle = spikeColor;
+        canvasCtx.lineWidth = 3;
+        canvasCtx.lineCap = 'round';
+        
+        for (let i = 0; i < numSpikes; i++) {
+            const angle = (i / numSpikes) * Math.PI * 2;
+            const frequency = (dataArray![Math.floor(i * dataArray!.length / numSpikes)] / 255);
+            const spikeLength = baseRadius + frequency * maxSpikeLength * 1.5;
+            
+            const x1 = centerX + Math.cos(angle) * baseRadius;
+            const y1 = centerY + Math.sin(angle) * baseRadius;
+            const x2 = centerX + Math.cos(angle) * spikeLength;
+            const y2 = centerY + Math.sin(angle) * spikeLength;
+            
+            canvasCtx.beginPath();
+            canvasCtx.moveTo(x1, y1);
+            canvasCtx.lineTo(x2, y2);
+            canvasCtx.stroke();
+        }
+        
+        // Draw center ball
+        const ballRadius = baseRadius * 0.6;
+        canvasCtx.fillStyle = spikeColor;
+        canvasCtx.beginPath();
+        canvasCtx.arc(centerX, centerY, ballRadius, 0, Math.PI * 2);
+        canvasCtx.fill();
+        
+        // Draw ball outline
+        canvasCtx.strokeStyle = spikeColor;
+        canvasCtx.lineWidth = 2;
+        canvasCtx.stroke();
 
         moodDisplay.textContent = mood;
         updateMetricBars(features);
