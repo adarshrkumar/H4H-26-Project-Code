@@ -805,7 +805,7 @@
         // ── A. Frequency layers (bass → mid → high, back to front) ────────────
         for (const [band, heightScale, opacityMax] of [
             ['bass', 1.2, 0.88],
-            ['mid',  1.0, 0.80],
+            ['mid',  1.0, 0.92],  // boosted: absorbs waveform color contribution
             ['high', 0.7, 0.70],
         ] as [keyof LayerFrame, number, number][]) {
             for (let i = 0; i < n; i++) {
@@ -813,23 +813,12 @@
                 const x     = canvas.width - (n - i) * barWidth;
                 const alpha = Math.min(1, i / (NUM_HISTORY * 0.15)) * opacityMax;
                 const bh    = Math.max(2, Math.pow(fr.e, 0.7) * canvas.height * heightScale);
-                canvasCtx.fillStyle = `oklch(${fr.l}% ${fr.c} ${fr.h} / ${alpha})`;
+                // Mid layer blends in the waveform's subtle lightness (72% → fr.l blend)
+                const l = band === 'mid' ? Math.max(fr.l, 72 * fr.e) : fr.l;
+                const c = band === 'mid' ? Math.max(fr.c, 0.14)      : fr.c;
+                canvasCtx.fillStyle = `oklch(${l}% ${c} ${fr.h} / ${alpha})`;
                 canvasCtx.fillRect(x, (canvas.height - bh) / 2, barWidth + 1, bh);
             }
-        }
-
-        // ── B. Waveform ───────────────────────────────────────────────────────
-        if (timeDomainArray && features.energy > MIN_THRESHOLD) {
-            canvasCtx.strokeStyle = `oklch(72% 0.14 ${smBand.mid.h} / 0.55)`;
-            canvasCtx.lineWidth   = 1.5;
-            canvasCtx.beginPath();
-            const step = canvas.width / timeDomainArray.length;
-            for (let i = 0; i < timeDomainArray.length; i++) {
-                const v = (timeDomainArray[i] / 128) - 1;
-                const y = cy + v * cy * 0.75;
-                i === 0 ? canvasCtx.moveTo(0, y) : canvasCtx.lineTo(i * step, y);
-            }
-            canvasCtx.stroke();
         }
 
         // ── C. Beat rings ─────────────────────────────────────────────────────
