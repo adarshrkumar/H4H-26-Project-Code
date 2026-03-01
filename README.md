@@ -1,14 +1,14 @@
-# ATSDC Stack Application
+# ATDSS Stack Application
 
-This is the main Astro application for the ATSDC Stack.
+This is the main Astro application for the ATDSS Stack (Astro, TypeScript, Drizzle, SCSS, Vercel AI SDK).
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
 - Node.js >= 18.0.0
-- Convex account (database + sync)
-- API keys for Better Auth, OpenAI, and optionally Exa
+- Neon PostgreSQL account (database)
+- API keys for Better Auth, OpenAI, ElevenLabs, and UploadThing
 
 ### Installation
 
@@ -27,8 +27,8 @@ cp .env.example .env
 Create a `.env` file with the following variables:
 
 ```env
-# Convex (database + sync)
-PUBLIC_CONVEX_URL="https://your-deployment.convex.cloud"
+# Neon PostgreSQL (database)
+DATABASE_URL="postgresql://user:password@host/database"
 
 # Better Auth Authentication
 BETTER_AUTH_SECRET="your-secret-key"
@@ -37,21 +37,14 @@ BETTER_AUTH_URL="http://localhost:4321"
 # OpenAI (for Vercel AI SDK)
 OPENAI_API_KEY="sk-..."
 
-# Exa Search (optional)
-EXA_API_KEY="..."
-
-# ElevenLabs (optional, required for TTS route)
+# ElevenLabs (music generation)
 ELEVENLABS_API_KEY="sk_..."
 
-# UploadThing (optional, required for TTS route)
+# UploadThing (file storage)
 UPLOADTHING_TOKEN="..."
-```
 
-### Convex Setup
-
-```bash
-# Start Convex dev server (run alongside astro dev)
-npm run convex
+# Optional
+VITE_APP_URL="http://localhost:5173"
 ```
 
 ### Development
@@ -66,10 +59,10 @@ Visit `http://localhost:4321`
 ## 📝 Available Scripts
 
 - `npm run dev` - Start development server
-- `npm run convex` - Start Convex dev server
 - `npm run build` - Build for production
 - `npm run preview` - Preview production build
 - `npm run astro` - Run Astro CLI commands
+- `npm run test` - Run E2E tests
 
 ## 📁 Project Structure
 
@@ -77,19 +70,18 @@ Visit `http://localhost:4321`
 src/
 ├── components/         # Reusable Astro components
 ├── db/                 # Database client and types
-│   ├── initialize.ts   # Convex client
-│   └── schema.ts       # Type exports from Convex
+│   ├── initialize.ts   # Drizzle client with Neon HTTP
+│   ├── schema.ts       # Drizzle table definitions
+│   ├── helpers.ts      # Database query helpers
+│   └── validations.ts  # Zod schemas
 ├── layouts/            # Page layouts
 │   └── Layout.astro
 ├── lib/                # Utility libraries
 │   ├── config.ts       # App configuration
 │   ├── content-converter.ts # Markdown/HTML conversion
-│   ├── dom-utils.ts    # DOM manipulation
-│   └── exa-search.ts   # AI-powered search
+│   └── dom-utils.ts    # DOM manipulation
 ├── pages/              # Routes and pages
 │   ├── api/            # API endpoints
-│   │   ├── chat.ts     # AI chat endpoint
-│   │   └── posts.ts    # Posts CRUD
 │   └── index.astro     # Home page
 └── styles/             # SCSS stylesheets
     ├── variables/      # SCSS variables and mixins
@@ -121,59 +113,43 @@ import '@/styles/components/button.scss';
 
 ## 🗄️ Database
 
-Database and real-time sync are handled by Convex. Define your schema in `convex/schema.ts`:
+Database is handled by Drizzle ORM with Neon PostgreSQL. Define your schema in `src/db/schema.ts`:
 
 ```typescript
-import { defineSchema, defineTable } from 'convex/server';
-import { v } from 'convex/values';
+import { pgTable, text, integer, timestamp } from 'drizzle-orm/pg-core';
 
-export default defineSchema({
-    posts: defineTable({
-        title: v.string(),
-        content: v.string(),
-    }),
+export const music = pgTable('music', {
+    id: text('id').primaryKey(),
+    title: text('title'),
+    duration: integer('duration'),
+    createdAt: timestamp('created_at').defaultNow(),
 });
 ```
 
-Query and mutate data using Convex functions in the `convex/` directory. Types are auto-generated in `convex/_generated/`.
+Query and mutate data using helpers in `src/db/helpers.ts`.
 
 ## 🔐 Authentication
 
-Authentication is handled by Better Auth. Configure in `src/lib/auth.ts`:
+Authentication is handled by Better Auth. Configure in your `.env`:
 
-```typescript
-import { betterAuth } from 'better-auth';
-
-export const auth = betterAuth({
-    // configuration
-});
+```env
+BETTER_AUTH_SECRET="your-secret-key"
+BETTER_AUTH_URL="http://localhost:4321"
 ```
 
 ## 🤖 AI Features
 
 ### Vercel AI SDK
 
-Chat endpoint example in `src/pages/api/chat.ts`:
+Chat and text generation powered by Vercel AI SDK.
 
-```typescript
-import { OpenAI } from 'ai';
+### Music Generation
 
-export const POST: APIRoute = async ({ request }) => {
-    // AI chat implementation
-};
-```
+ElevenLabs API for music generation.
 
-### Exa Search
+### File Storage
 
-AI-powered search utilities in `src/lib/exa-search.ts`.
-
-## 📱 Progressive Web App
-
-This app includes PWA support with offline capabilities:
-
-- Service worker auto-generated
-- Installable on mobile/desktop
-- Offline caching configured in `astro.config.mjs`
+UploadThing for reliable file uploads and storage.
 
 ## 🚀 Deployment
 
@@ -189,22 +165,21 @@ vercel
 
 Make sure to set these environment variables in your Vercel project settings:
 
-- `PUBLIC_CONVEX_URL`
+- `DATABASE_URL`
 - `BETTER_AUTH_SECRET`
 - `BETTER_AUTH_URL`
 - `OPENAI_API_KEY`
-- `EXA_API_KEY` (optional)
-- `ELEVENLABS_API_KEY` (if using ElevenLabs TTS)
-- `UPLOADTHING_TOKEN` (if using UploadThing uploads)
+- `ELEVENLABS_API_KEY`
+- `UPLOADTHING_TOKEN`
 
 ## 📚 Documentation
 
 - [Astro Documentation](https://docs.astro.build)
-- [Convex](https://docs.convex.dev)
+- [Drizzle ORM](https://orm.drizzle.team)
+- [Neon PostgreSQL](https://neon.tech/docs)
 - [Better Auth](https://www.better-auth.com/docs)
 - [Vercel AI SDK](https://sdk.vercel.ai/docs)
 - [Zod](https://zod.dev)
-- [Exa Search](https://docs.exa.ai)
 
 ## 🛠️ Utilities
 
@@ -217,21 +192,14 @@ const markdown = htmlToMarkdown('<h1>Hello</h1>');
 const html = markdownToHtml('# Hello');
 ```
 
-### DOM Manipulation
+### Database Queries
 
 ```typescript
-import { extractText, findLinks } from '@/lib/dom-utils';
+import { createRecording, getRecording, updateRecording } from '@/db/helpers';
 
-const text = extractText(htmlString);
-const links = findLinks(htmlString);
-```
-
-### AI Search
-
-```typescript
-import { searchWithExa } from '@/lib/exa-search';
-
-const results = await searchWithExa('your query');
+const music = await createRecording(data);
+const existing = await getRecording(id);
+await updateRecording(id, updates);
 ```
 
 ## 📄 License

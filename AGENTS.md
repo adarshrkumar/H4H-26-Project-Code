@@ -5,9 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-# Development (run both simultaneously)
+# Development
 npm run dev          # Astro dev server on port 4321
-npm run convex       # Convex backend dev server
 
 # Build & Check
 npm run build        # astro check && astro build
@@ -25,13 +24,13 @@ npm run ts <file.ts>            # node --experimental-strip-types
 
 ## Architecture
 
-**Stack (ATSDC)**: Astro 5 + TypeScript + Convex + SCSS + Vercel AI SDK
+**Stack (ATDSS)**: Astro 5 + TypeScript + Drizzle + SCSS + Vercel AI SDK
 
 **Rendering**: Server-side (`output: 'server'`) via `@astrojs/vercel` adapter.
 
-**Database**: Convex (real-time sync). Schema is in `convex/schema.ts` with `tracks` and `analyses` tables. Convex functions live in `convex/tracks.ts` and `convex/analyses.ts`. The HTTP client is initialized in `src/db/initialize.ts`. `drizzle.config.ts` is deprecated and can be ignored.
+**Database**: Drizzle ORM with Neon PostgreSQL. Schema is in `src/db/schema.ts` with `music` table. Database functions live in `src/db/helpers.ts`. The Drizzle client is initialized in `src/db/initialize.ts`.
 
-**AI**: Exa search integration lives in `src/lib/exa-search.ts`.
+**AI**: Vercel AI SDK for text and structured generation.
 
 **Key path aliases** (from `tsconfig.json`):
 
@@ -55,4 +54,4 @@ The flagship feature is an **Audio to Color visualizer** (`src/pages/index.astro
 
 ## Required Environment Variables
 
-See `.env.example`. Minimum for local dev: `PUBLIC_CONVEX_URL`, `OPENAI_API_KEY`. Auth (`BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`) and search (`EXA_API_KEY`) are optional unless those features are exercised.
+See `.env.example`. Minimum for local dev: `DATABASE_URL`, `OPENAI_API_KEY`. Auth (`BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`) and file storage (`UPLOADTHING_TOKEN`) are optional unless those features are exercised.
