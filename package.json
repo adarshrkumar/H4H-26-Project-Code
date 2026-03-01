@@ -14,8 +14,8 @@
         "test:firefox": "npx playwright test --headed --browser=firefox",
         "test:safari": "npx playwright test --headed --browser=webkit",
         "test": "npm run test:chrome && npm run test:firefox && npm run test:safari",
-        "spatial:dev": "SPATIAL_BUILD=1 next build && webspatial-builder run",
-        "spatial:build": "SPATIAL_BUILD=1 next build && webspatial-builder build",
+        "spatial:dev": "webspatial-builder run --manifest-url http://localhost:3000/manifest.webmanifest",
+        "spatial:build": "webspatial-builder build --manifest-url http://localhost:3000/manifest.webmanifest",
         "stylelint:fix": "npx stylelint \"src/**/*.scss\" --fix"
     },
     "dependencies": {
