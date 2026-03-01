@@ -531,8 +531,8 @@
 
     let audioContext:     AudioContext | null = null;
     let analyser:         AnalyserNode | null = null;
-    let dataArray:        Uint8Array<ArrayBuffer> | null = null;
-    let timeDomainArray:  Uint8Array<ArrayBuffer> | null = null;
+    let dataArray:        Uint8Array | null = null;
+    let timeDomainArray:  Uint8Array | null = null;
     let animationFrameId: number | null = null;
     let sourceNode:       MediaStreamAudioSourceNode | null = null;
     let bufferSource:     AudioBufferSourceNode | null = null;
@@ -552,8 +552,8 @@
     function setupAnalyser() {
         analyser = audioContext!.createAnalyser();
         analyser.fftSize = 2048;
-        dataArray       = new Uint8Array(analyser.frequencyBinCount);
-        timeDomainArray = new Uint8Array(analyser.fftSize);
+        dataArray       = new Uint8Array(analyser.frequencyBinCount) as Uint8Array;
+        timeDomainArray = new Uint8Array(analyser.fftSize) as Uint8Array;
     }
 
     function resetCanvas() {
@@ -720,8 +720,8 @@
 
         animationFrameId = requestAnimationFrame(drawVisualization);
 
-        analyser.getByteFrequencyData(dataArray!);
-        analyser.getByteTimeDomainData(timeDomainArray!);
+        analyser.getByteFrequencyData(dataArray! as Uint8Array<ArrayBuffer>);
+        analyser.getByteTimeDomainData(timeDomainArray! as Uint8Array<ArrayBuffer>);
 
         const features = getAudioFeatures(dataArray!, timeDomainArray!);
         const mood     = getMood(features);
