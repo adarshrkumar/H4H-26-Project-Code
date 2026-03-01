@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this Astro repository.
 
 ## Commands
 
@@ -24,7 +24,7 @@ npm run ts <file.ts>            # node --experimental-strip-types
 
 ## Architecture
 
-# Huephonics Astro 5 + TypeScript + Drizzle + SCSS + Vercel AI SDK
+**Stack (ATSDC)**: Astro 5 + TypeScript + SCSS + Drizzle + (Client/SDK)
 
 **Rendering**: Server-side (`output: 'server'`) via `@astrojs/vercel` adapter.
 
