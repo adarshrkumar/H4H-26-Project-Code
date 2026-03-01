@@ -10,7 +10,6 @@ import TurndownService from 'turndown';
 marked.setOptions({
     gfm: true, // GitHub Flavored Markdown
     breaks: true, // Convert \n to <br>
-    mangle: false, // Don't escape email addresses
 });
 
 // Configure turndown for HTML to markdown conversion
