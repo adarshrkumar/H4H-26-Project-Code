@@ -238,7 +238,9 @@
         btn.disabled = true;
         resultEl.innerHTML = '';
         resultEl.hidden = false;
-        btn.textContent = '⟳ Generating sections…';
+        btn.textContent = '⟳ Building song blueprint…';
+
+        const blueprint = await generateBlueprint(globals);
 
         let doneCount  = 0;
         let errorCount = 0;
@@ -249,7 +251,7 @@
             btn.textContent = `⟳ Generating ${SECTION_LABELS[id]}…`;
 
             try {
-                const url = await generateSection(id, globals);
+                const url = await generateSection(id, globals, blueprint);
                 doneCount++;
 
                 if (statusEl) setStatus(statusEl, 'done', '✓ Ready');
