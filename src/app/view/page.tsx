@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: config.name };
 
 export default function ViewPage() {
     return (
-        <>
+        <div className="view-page" enable-xr={true}>
             <h1>Audio to Color</h1>
 
             <div id="mode-tabs" className="mode-tabs" enable-xr={true}>
@@ -36,7 +36,7 @@ export default function ViewPage() {
                 </div>
             </div>
 
-            <canvas id="colorCanvas" className="color-canvas" width={660} height={280} enable-xr={true} />
+            <canvas id="colorCanvas" className="color-canvas" width={660} height={280} />
 
             <p id="mood" className="mood"></p>
 
@@ -44,6 +44,6 @@ export default function ViewPage() {
             <div id="metrics" className="metrics" enable-xr={true}></div>
 
             <ViewScriptRunner />
-        </>
+        </div>
     );
 }
