@@ -36,7 +36,7 @@ const requestSchema = z.object({
     outputFormat: z.string().min(1).optional(),
     // Duration in ms (3 000 – 120 000). Drives per-section length so the full
     // song lands between ~2:30 and 4:00.
-    musicLengthMs: z.number().int().min(3000).max(120000).optional(),
+    musicLengthMs: z.number().int().min(3000).max(240000).optional(),
 });
 
 export const POST: APIRoute = async ({ request }) => {
