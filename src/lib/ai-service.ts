@@ -1,47 +1,41 @@
-import { generateText, generateObject } from 'ai';
+import { generateText } from 'ai';
 import type { LanguageModel } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
+import { generateObject } from 'ai';
 
-// Use Vercel AI Gateway if API key is available, otherwise fall back to direct OpenAI
-const getModel = (): LanguageModel => {
+// Initialize model with Vercel AI Gateway or direct OpenAI
+function getModel(): LanguageModel {
     const vercelApiKey = (import.meta.env as Record<string, string | undefined>)?.AI_GATEWAY_API_KEY || process.env.AI_GATEWAY_API_KEY;
     const openaiApiKey = (import.meta.env as Record<string, string | undefined>)?.OPENAI_API_KEY || process.env.OPENAI_API_KEY;
 
     if (vercelApiKey) {
-        // Use Vercel AI Gateway
         return createOpenAI({
             apiKey: vercelApiKey,
-            baseURL: 'https://ai-gateway.vercel.sh/v3/ai',
+            baseURL: 'https://ai-gateway.vercel.sh/v1',
         })('gpt-4o-mini');
     }
 
     if (openaiApiKey) {
-        // Use direct OpenAI
         return createOpenAI({
             apiKey: openaiApiKey,
         })('gpt-4o-mini');
     }
 
     throw new Error('Either AI_GATEWAY_API_KEY or OPENAI_API_KEY must be set');
-};
+}
 
 const model: LanguageModel = getModel();
 
-/**
- * Generate text using AI
- */
+// Generate text using AI
 export async function generateAIText(
     prompt: string,
     options?: {
-        maxTokens?: number;
         temperature?: number;
     }
 ): Promise<string> {
     try {
-        const {
-            text,
-        } = await generateText({
+        const { text } = await generateText({
             model,
             prompt,
             temperature: options?.temperature ?? 0.7,
@@ -50,25 +44,22 @@ export async function generateAIText(
         return text;
     } catch (err) {
         console.error('[ai-service] generateAIText error:', err);
-        throw new Error('Failed to generate text');
+        throw new Error(
+            err instanceof Error ? err.message : 'Failed to generate text'
+        );
     }
 }
 
-/**
- * Generate structured data using AI
- */
+// Generate structured data using AI
 export async function generateAIObject<T extends z.ZodType>(
     prompt: string,
     schema: T,
     options?: {
-        maxTokens?: number;
         temperature?: number;
     }
 ): Promise<z.infer<T>> {
     try {
-        const {
-            object,
-        } = await generateObject({
+        const { object } = await generateObject({
             model,
             prompt,
             schema,
@@ -78,16 +69,14 @@ export async function generateAIObject<T extends z.ZodType>(
         return object;
     } catch (err) {
         console.error('[ai-service] generateAIObject error:', err);
-        throw new Error('Failed to generate structured data');
+        throw new Error(
+            err instanceof Error ? err.message : 'Failed to generate structured data'
+        );
     }
 }
 
-/**
- * Analyze mood from text
- */
-export async function analyzeTextMood(
-    text: string
-): Promise<{
+// Analyze mood from text
+export async function analyzeTextMood(text: string): Promise<{
     mood: string;
     confidence: number;
     analysis: string;
@@ -106,12 +95,8 @@ export async function analyzeTextMood(
     return result;
 }
 
-/**
- * Generate a music prompt description
- */
-export async function generateMusicPromptDescription(
-    userPrompt: string
-): Promise<string> {
+// Generate a music prompt description
+export async function generateMusicPromptDescription(userPrompt: string): Promise<string> {
     const description = await generateAIText(
         `Based on this music description: "${userPrompt}", expand it into a detailed music generation prompt for an AI music generator. Make it descriptive and specific about the genre, mood, instruments, and style.`,
         {
@@ -122,12 +107,8 @@ export async function generateMusicPromptDescription(
     return description;
 }
 
-/**
- * Generate song metadata
- */
-export async function generateSongMetadata(
-    prompt: string
-): Promise<{
+// Generate song metadata
+export async function generateSongMetadata(prompt: string): Promise<{
     title: string;
     artist: string;
     genre: string;
@@ -148,9 +129,7 @@ export async function generateSongMetadata(
     return result;
 }
 
-/**
- * Generate song lyrics
- */
+// Generate song lyrics
 export async function generateSongLyrics(
     prompt: string,
     options?: {

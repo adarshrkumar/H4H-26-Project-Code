@@ -7,16 +7,17 @@ import { createRecording } from '@/db/helpers.ts';
 
 const OUTPUT_FORMAT = 'mp3_44100_128' as const;
 
-let _music: Music | null = null;
+let music: Music | null = null;
+
 function getMusic(): Music {
-    if (!_music) {
+    if (!music) {
         const apiKey = import.meta.env.ELEVENLABS_API_KEY ?? process.env.ELEVENLABS_API_KEY;
         if (!apiKey) {
             throw new Error('ELEVENLABS_API_KEY is not set');
         }
-        _music = new Music({ apiKey });
+        music = new Music({ apiKey });
     }
-    return _music;
+    return music;
 }
 
 function isElevenLabsError(err: unknown): err is { statusCode: number; body: Record<string, unknown> } {
@@ -36,8 +37,7 @@ const requestSchema = z.object({
     voiceId: z.string().min(1).optional(),
     modelId: z.string().min(1).optional(),
     outputFormat: z.string().min(1).optional(),
-    // Duration in ms (3 000 – 120 000). Drives per-section length so the full
-    // song lands between ~2:30 and 4:00.
+    // Duration in ms (3 000 – 120 000). Drives per-section length so the full song lands between ~2:30 and 4:00.
     musicLengthMs: z.number().int().min(3000).max(240000).optional(),
 });
 
@@ -50,7 +50,7 @@ export const POST: APIRoute = async ({ request }) => {
     } catch (error) {
         if (error instanceof z.ZodError) {
             return Response.json(
-                { error: 'Invalid request body', details: error.issues }, 
+                { error: 'Invalid request body', details: error.issues },
                 { status: 400 }
             );
         }
