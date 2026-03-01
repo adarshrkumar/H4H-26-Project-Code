@@ -34,14 +34,7 @@ npm run ts <file.ts> # node --experimental-strip-types
 
 **Database**: Drizzle ORM + Neon PostgreSQL. App schema in `src/db/schema.ts` (`music` table: id, title, artist, mimeType, fileKey, fileUrl, uploadedAt). Auth schema in `src/db/auth-schema.ts` (user/session/account/verification tables). DB client in `src/db/initialize.ts`. CRUD helpers in `src/db/helpers.ts` (`saveTrack`).
 
-**Auth**: BetterAuth with Drizzle adapter (emailAndPassword enabled).
-
-- `src/lib/auth.ts` — server auth instance
-- `src/lib/auth-client.ts` — client-side `authClient` (`createAuthClient`, uses `NEXT_PUBLIC_BETTER_AUTH_URL`)
-- `src/app/api/auth/[...all]/route.ts` — catch-all GET + POST handler
-- `src/app/auth/page.tsx` — login / sign-up page
-- `src/components/AuthForm.tsx` — client component (tabs: log in / sign up)
-- `src/middleware.ts` — minimal Next.js Edge Middleware (extend here for route protection)
+**Auth**: BetterAuth integration is currently not part of the active Vite runtime path.
 
 **AI / Music Generation**:
 
@@ -58,13 +51,12 @@ npm run ts <file.ts> # node --experimental-strip-types
 
 | Path | Description |
 | --- | --- |
-| `src/app/layout.tsx` | Root layout — HTML shell, global SCSS, metadata |
-| `src/app/page.tsx` | Compose page (Server Component + `IndexScriptRunner`) |
-| `src/app/view/page.tsx` | Huephonic audio visualizer (Server Component + `ViewScriptRunner`) |
-| `src/app/auth/page.tsx` | Login / sign-up page |
-| `src/components/AuthForm.tsx` | Login/signup client form |
+| `src/App.tsx` | Root app router logic (`compose` vs `view`) |
+| `src/components/ComposePageContent.tsx` | Compose page UI shell |
+| `src/components/ViewPageContent.tsx` | View page UI shell |
 | `src/components/IndexScriptRunner.tsx` | `'use client'` runner for compose page |
 | `src/components/ViewScriptRunner.tsx` | `'use client'` runner for audio page |
+| `src/components/ViewSpatialSpheres.tsx` | 3D spatial spheres for XR `/view` |
 | `src/scripts/indexScript.ts` | `initIndexScript()` — all compose-page DOM/fetch logic |
 | `src/scripts/viewScript.ts` | `initViewScript()` — Web Audio pipeline, returns cleanup fn |
 
