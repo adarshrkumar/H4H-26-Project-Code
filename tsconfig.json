@@ -1,15 +1,9 @@
 {
-    "extends": "astro/tsconfigs/strict",
+    "extends": "next/tsconfig.json",
     "compilerOptions": {
         "target": "ES2022",
-        "module": "ESNext",
-        "moduleResolution": "bundler",
-        "lib": [
-            "ES2022",
-            "DOM",
-            "DOM.Iterable"
-        ],
-        "jsx": "react-jsx",
+        "lib": ["ES2022", "DOM", "DOM.Iterable"],
+        "jsx": "preserve",
         "jsxImportSource": "react",
         "strict": true,
         "esModuleInterop": true,
@@ -18,28 +12,18 @@
         "resolveJsonModule": true,
         "isolatedModules": true,
         "allowJs": true,
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "noEmit": true,
         "baseUrl": ".",
         "paths": {
-            "@/*": [
-                "src/*"
-            ],
-            "@db/*": [
-                "src/db/*"
-            ],
-            "@styles/*": [
-                "src/styles/*"
-            ],
-            "@components/*": [
-                "src/components/*"
-            ]
-        }
+            "@/*": ["src/*"],
+            "@db/*": ["src/db/*"],
+            "@styles/*": ["src/styles/*"],
+            "@components/*": ["src/components/*"]
+        },
+        "plugins": [{ "name": "next" }]
     },
-    "include": [
-        "src/**/*",
-        ".astro/**/*"
-    ],
-    "exclude": [
-        "node_modules",
-        "dist"
-    ]
+    "include": ["src/**/*", "next-env.d.ts", ".next/types/**/*.ts"],
+    "exclude": ["node_modules", "dist", ".astro"]
 }
