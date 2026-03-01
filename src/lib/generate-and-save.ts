@@ -164,6 +164,9 @@ export async function generateAndSave(input: GenerateAndSavePayload): Promise<Ge
         const file = new File([new Uint8Array(audio)], filename, { type: 'audio/mpeg' });
         const uploaded = await uploadFile(file);
         console.log('[generate-and-save] step 3: upload result', JSON.stringify(uploaded));
+        if (uploaded.error) {
+            throw new Error(`UploadThing error: ${uploaded.error.code} — ${uploaded.error.message}`);
+        }
         fileKey = uploaded.data?.key ?? '';
         fileUrl = fileKey ? getFileUrl(fileKey) : undefined;
         console.log('[generate-and-save] step 3: fileKey:', fileKey, 'fileUrl:', fileUrl);

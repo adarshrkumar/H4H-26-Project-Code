@@ -1,3 +1,10 @@
-import { ConvexHttpClient } from 'convex/browser';
+import { drizzle } from 'drizzle-orm/neon-http';
 
-export const convex = new ConvexHttpClient(import.meta.env.PUBLIC_CONVEX_URL);
+import { neon } from "@neondatabase/serverless";
+import "dotenv/config";
+
+const sql = neon(import.meta.env.DATABASE_URL || process.env.DATABASE_URL!);
+
+const db = drizzle({ client: sql });
+
+export { db };
