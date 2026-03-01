@@ -14,12 +14,15 @@
     "format": "biome format ."
   },
   "dependencies": {
+    "@elevenlabs/elevenlabs-js": "^1.0.0",
     "@neondatabase/serverless": "^1.0.0",
     "astro": "^5.16.6",
     "cheerio": "^1.0.0",
     "dotenv": "^17.3.1",
     "drizzle-orm": "^0.45.1",
     "drizzle-kit": "^0.29.1",
+    "marked": "^12.0.0",
+    "turndown": "^7.1.3",
     "vite-plugin-pwa": "^0.20.0",
     "zod": "^3.22.4"
   },
@@ -32,6 +35,7 @@
     "@types/node": "^20.10.6",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.3",
+    "@types/turndown": "^5.0.4",
     "astro": "^5.16.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

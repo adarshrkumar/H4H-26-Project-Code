@@ -1,7 +1,7 @@
 import { db } from './initialize';
 import { music } from './schema';
 import { eq } from 'drizzle-orm';
-import type { CreateMusicInput, UpdateMusicInput } from './validations';
+import type { CreateMusicInput } from './validations';
 
 export async function createRecording(data: CreateMusicInput) {
     return await db.insert(music).values(data).returning();
