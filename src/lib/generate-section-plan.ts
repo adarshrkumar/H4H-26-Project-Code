@@ -1,7 +1,6 @@
 import 'dotenv/config';
-import { generateObject } from 'ai';
-import { createAnthropic } from '@ai-sdk/anthropic';
 import { z } from 'zod';
+import { structured } from '@/lib/ai-service';
 import type { SectionPrompt } from './generate-and-save';
 
 export interface GenerateSectionPlanInput {
@@ -23,16 +22,7 @@ const sectionPromptSchema = z.object({
     lines: z.array(z.string()).describe('formatted lyric lines for this section'),
 });
 
-function getAnthropic() {
-    const apiKey =
-        (import.meta as unknown as { env: Record<string, string> }).env?.ANTHROPIC_API_KEY ??
-        process.env.ANTHROPIC_API_KEY;
-    return createAnthropic({ apiKey });
-}
-
 export async function generateSectionPlan(input: GenerateSectionPlanInput): Promise<SectionPrompt> {
-    const anthropic = getAnthropic();
-
     const contextParts: string[] = [];
     if (input.mood) contextParts.push(`mood: ${input.mood}`);
     if (input.songStyle) contextParts.push(`style: ${input.songStyle}`);
@@ -57,12 +47,7 @@ Generate:
 - durationMs: Appropriate duration in milliseconds. Typical: intro 15000-30000, verse 30000-45000, chorus 20000-35000, bridge 15000-25000, outro 15000-30000.
 - lines: The lyric lines to sing. Use the provided lyrics if given, otherwise generate fitting lyrics. Each line should be a separate string.`;
 
-    const { object } = await generateObject({
-        model: anthropic('claude-haiku-4-5-20251001'),
-        schema: sectionPromptSchema,
-        prompt,
-        temperature: 1,
-    });
+    const object = await structured(prompt, sectionPromptSchema, { temperature: 1 });
 
     return {
         sectionName: input.sectionName,
