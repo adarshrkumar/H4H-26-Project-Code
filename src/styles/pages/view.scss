@@ -279,18 +279,17 @@ html.is-spatial {
 
     --xr-background-material: transparent;
 
+    .view-page {
+        --xr-background-material: translucent;
+
+        border-radius: 24px;
+        position: relative;
+    }
+
     .mode-tabs {
         --xr-background-material: thick;
 
         position: relative;
-    }
-
-    .color-canvas {
-        --xr-background-material: translucent;
-
-        position: relative;
-
-        --xr-back: 20;
     }
 
     .metrics {
