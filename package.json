@@ -50,6 +50,7 @@
         "@types/node": "^22.10.5",
         "@types/turndown": "^5.0.5",
         "@vite-pwa/assets-generator": "^0.2.6",
+        "drizzle-kit": "^0.31.9",
         "stylelint": "^16.26.1",
         "stylelint-config-standard-scss": "^14.0.0",
         "vercel": "^39.2.0",
