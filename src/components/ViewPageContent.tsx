@@ -3,7 +3,9 @@ import '@/styles/pages/view.scss';
 
 export default function ViewPageContent() {
     return (
-        <div className="view-page" enable-xr={true}>
+        <div className="view-page">
+            {/* Spatial glass background — enable-xr only on this inert layer */}
+            <div className="view-page__glass" enable-xr={true} />
             <a href="#/compose" className="btn secondary">← Back</a>
             <h1>Audio to Color</h1>
 

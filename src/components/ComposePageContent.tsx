@@ -32,7 +32,9 @@ const sections = [
 export default function ComposePageContent() {
     return (
         <>
-            <div className="compose-page" enable-xr={true}>
+            <div className="compose-page">
+                {/* Spatial glass background — enable-xr only on this inert layer */}
+                <div className="compose-page__glass" enable-xr={true} />
 
                 {/* ── Header ──────────────────────────────────────────── */}
                 <header className="compose-header">

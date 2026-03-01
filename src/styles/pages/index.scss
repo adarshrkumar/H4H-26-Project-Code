@@ -17,8 +17,19 @@ body {
     min-height: 100vh;
 }
 
+.compose-page__glass {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border-radius: 24px;
+    pointer-events: none;
+    --xr-background-material: translucent;
+    --xr-back: -10;
+}
+
 .compose-page {
     width: 100%;
+    position: relative;
     padding: 40px 40px 100px;
     display: flex;
     flex-direction: column;
@@ -26,8 +37,7 @@ body {
     position: relative;
     border-radius: 24px;
 
-    // WebSpatial: translucent glass panel floating in visionOS space
-    --xr-background-material: translucent;
+    // WebSpatial glass handled by .compose-page__glass child
 
     // Ambient radial glow that shifts with mood
     &::before {
