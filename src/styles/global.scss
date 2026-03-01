@@ -1,7 +1,6 @@
 // OpenProps - CSS design tokens
 @use 'open-props/style' as *;
 @use 'open-props/normalize' as *;
-
 @use './reset' as *;
 @use './variables/globals' as *;
 @use './variables/mixins' as *;
@@ -24,6 +23,7 @@ html {
     font-size: 16px;
     color: $text-primary;
     background-color: $bg-primary;
+
     @include smooth-scroll;
 }
 
@@ -34,16 +34,19 @@ body {
 // Typography
 h1 {
     @include heading-1;
+
     margin-bottom: $spacing-large;
 }
 
 h2 {
     @include heading-2;
+
     margin-bottom: $spacing-medium;
 }
 
 h3 {
     @include heading-3;
+
     margin-bottom: $spacing-medium;
 }
 

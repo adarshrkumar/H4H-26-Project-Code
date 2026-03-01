@@ -2,6 +2,7 @@
 
 :root {
     --mood-color: #e94560;
+
     // RGB channels updated by JS alongside --mood-color
     --mood-r: 233;
     --mood-g: 69;
@@ -85,8 +86,8 @@ body {
         letter-spacing: 0.14em;
         text-transform: uppercase;
         color: var(--mood-color);
-        background-color: rgba(var(--mood-r), var(--mood-g), var(--mood-b), 0.12);
-        border: 1px solid rgba(var(--mood-r), var(--mood-g), var(--mood-b), 0.35);
+        background-color: rgb(var(--mood-r) var(--mood-g) var(--mood-b) / 12%);
+        border: 1px solid rgb(var(--mood-r) var(--mood-g) var(--mood-b) / 35%);
         border-radius: 999px;
         padding: 4px 14px;
         margin-bottom: 16px;
@@ -194,31 +195,37 @@ body {
         animation-duration: 0.35s;
         animation-delay: calc(var(--i) * 0.04s);
     }
+
     .mood-btn[data-pulse='slow'] & span {
         animation-name: bar-wave;
         animation-duration: 2.6s;
         animation-delay: calc(var(--i) * 0.35s);
     }
+
     .mood-btn[data-pulse='drift'] & span {
         animation-name: bar-rise;
         animation-duration: 3.2s;
         animation-delay: calc(var(--i) * 0.42s);
     }
+
     .mood-btn[data-pulse='bounce'] & span {
         animation-name: bar-explode;
         animation-duration: 0.55s;
         animation-delay: calc(var(--i) * 0.07s);
     }
+
     .mood-btn[data-pulse='deep'] & span {
         animation-name: bar-steady;
         animation-duration: 1.9s;
         animation-delay: 0s;
     }
+
     .mood-btn[data-pulse='float'] & span {
         animation-name: bar-minimal;
         animation-duration: 4.2s;
         animation-delay: calc(var(--i) * 0.55s);
     }
+
     .mood-btn[data-pulse='rapid'] & span {
         animation-name: bar-chaos;
         animation-duration: 0.22s;
@@ -297,7 +304,7 @@ body {
 
         &[data-state='done'] {
             border-color: var(--mood-color);
-            background-color: rgba(var(--mood-r), var(--mood-g), var(--mood-b), 0.08);
+            background-color: rgb(var(--mood-r) var(--mood-g) var(--mood-b) / 8%);
         }
     }
 
@@ -400,19 +407,19 @@ body {
         &[data-state='loading'] {
             color: #60a5fa;
             border-color: #3b82f6;
-            background-color: rgba(59, 130, 246, 0.07);
+            background-color: rgb(59 130 246 / 7%);
         }
 
         &[data-state='done'] {
             color: #4ade80;
             border-color: #22c55e;
-            background-color: rgba(34, 197, 94, 0.07);
+            background-color: rgb(34 197 94 / 7%);
         }
 
         &[data-state='error'] {
             color: #f87171;
             border-color: #f87171;
-            background-color: rgba(248, 113, 113, 0.07);
+            background-color: rgb(248 113 113 / 7%);
         }
     }
 
@@ -472,7 +479,7 @@ body {
     grid-template-columns: repeat(3, 1fr);
     gap: 10px;
 
-    @media (max-width: 560px) {
+    @media (width <= 560px) {
         grid-template-columns: repeat(2, 1fr);
     }
 }
@@ -492,15 +499,15 @@ body {
     transition: border-color 0.2s, background-color 0.2s, transform 0.15s;
 
     &:hover {
-        border-color: rgba(var(--mood-r), var(--mood-g), var(--mood-b), 0.6);
-        background-color: rgba(var(--mood-r), var(--mood-g), var(--mood-b), 0.06);
+        border-color: rgb(var(--mood-r) var(--mood-g) var(--mood-b) / 60%);
+        background-color: rgb(var(--mood-r) var(--mood-g) var(--mood-b) / 6%);
         transform: translateY(-2px);
         color: #ddd;
     }
 
     &.selected {
         border-color: var(--mood-color);
-        background-color: rgba(var(--mood-r), var(--mood-g), var(--mood-b), 0.12);
+        background-color: rgb(var(--mood-r) var(--mood-g) var(--mood-b) / 12%);
         color: #fff;
 
         .energy-card__icon { transform: scale(1.2); }
@@ -641,7 +648,7 @@ body {
         border: 1.5px solid #1e1e3a;
         border-radius: 10px;
         font-size: 0.88rem;
-        font-family: 'Georgia', serif;
+        font-family: Georgia, serif;
         color: #ccc;
         resize: vertical;
         line-height: 1.75;
@@ -659,14 +666,14 @@ body {
 // ── Chapter card lyrics ───────────────────────────────────────────────────────
 
 .chapter-card__lyrics {
-    font-family: 'Georgia', serif;
+    font-family: Georgia, serif;
     font-size: 0.78rem;
     color: #555;
     line-height: 1.75;
     white-space: pre-line;
     margin: 0;
     padding: 8px 12px;
-    border-left: 2px solid rgba(var(--mood-r), var(--mood-g), var(--mood-b), 0.4);
+    border-left: 2px solid rgb(var(--mood-r) var(--mood-g) var(--mood-b) / 40%);
     transition: color 0.3s;
 
     .chapter-card[data-playing='true'] & {
@@ -810,9 +817,9 @@ body {
     &[data-playing='true'] {
         border-color: var(--section-color, var(--mood-color));
         box-shadow:
-            0 0 0 2px rgba(var(--mood-r), var(--mood-g), var(--mood-b), 0.3),
-            0 0 60px rgba(var(--mood-r), var(--mood-g), var(--mood-b), 0.12);
-        background-color: rgba(var(--mood-r), var(--mood-g), var(--mood-b), 0.04);
+            0 0 0 2px rgb(var(--mood-r) var(--mood-g) var(--mood-b) / 30%),
+            0 0 60px rgb(var(--mood-r) var(--mood-g) var(--mood-b) / 12%);
+        background-color: rgb(var(--mood-r) var(--mood-g) var(--mood-b) / 4%);
     }
 
     &__header {
@@ -926,7 +933,7 @@ body {
 }
 
 @keyframes pulse-done {
-    0%   { box-shadow: 0 0 0 0   rgba(74, 222, 128, 0.55); }
-    55%  { box-shadow: 0 0 0 22px rgba(74, 222, 128, 0);   }
-    100% { box-shadow: 0 0 0 0   rgba(74, 222, 128, 0);    }
+    0%   { box-shadow: 0 0 0 0   rgb(74 222 128 / 55%); }
+    55%  { box-shadow: 0 0 0 22px rgb(74 222 128 / 0%);   }
+    100% { box-shadow: 0 0 0 0   rgb(74 222 128 / 0%);    }
 }

@@ -43,7 +43,7 @@
             border-color: $error-color;
 
             &:focus {
-                box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+                box-shadow: 0 0 0 3px rgb(239 68 68 / 10%);
             }
         }
 
@@ -51,7 +51,7 @@
             border-color: $success-color;
 
             &:focus {
-                box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+                box-shadow: 0 0 0 3px rgb(16 185 129 / 10%);
             }
         }
 
@@ -59,7 +59,7 @@
             border-color: $warning-color;
 
             &:focus {
-                box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
+                box-shadow: 0 0 0 3px rgb(245 158 11 / 10%);
             }
         }
 
@@ -79,7 +79,7 @@
             border-color: $error-color;
 
             &:focus {
-                box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+                box-shadow: 0 0 0 3px rgb(239 68 68 / 10%);
             }
         }
 
@@ -87,7 +87,7 @@
             border-color: $success-color;
 
             &:focus {
-                box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+                box-shadow: 0 0 0 3px rgb(16 185 129 / 10%);
             }
         }
 
@@ -95,7 +95,7 @@
             border-color: $warning-color;
 
             &:focus {
-                box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
+                box-shadow: 0 0 0 3px rgb(245 158 11 / 10%);
             }
         }
 
@@ -206,6 +206,7 @@
 
     &-actions {
         @include flex-between;
+
         margin-top: $spacing-extra-large;
         gap: $spacing-medium;
 
