@@ -103,6 +103,16 @@ body {
         letter-spacing: 0.04em;
         flex-shrink: 0;
     }
+
+    &__meta {
+        font-size: 0.66rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #3b4568;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
 }
 
 // Mood buttons (override)
@@ -447,6 +457,85 @@ body {
     strong { color: #999; font-weight: 800; }
 
     &[data-state='visible'] { opacity: 1; }
+}
+
+.viz-sphere-labels {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 2;
+    pointer-events: none;
+}
+
+.viz-sphere-label {
+    display: grid;
+    grid-template-columns: 8px auto auto;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid #1b2341;
+    background: rgb(6 10 28 / 78%);
+    backdrop-filter: blur(6px);
+}
+
+.viz-sphere-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: #7f8dbf;
+}
+
+.viz-sphere-label[data-band='bass'] .viz-sphere-dot {
+    background: #ff6b5e;
+}
+
+.viz-sphere-label[data-band='lowmid'] .viz-sphere-dot {
+    background: #ffb04f;
+}
+
+.viz-sphere-label[data-band='mid'] .viz-sphere-dot {
+    background: #58c1ff;
+}
+
+.viz-sphere-label[data-band='treble-high'] .viz-sphere-dot {
+    background: #8f8dff;
+}
+
+.viz-sphere-name {
+    font-size: 0.61rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #8d98ba;
+}
+
+.viz-sphere-value {
+    min-width: 32px;
+    text-align: right;
+    font-size: 0.66rem;
+    font-weight: 700;
+    color: #d4ddff;
+}
+
+@media (width <= 900px) {
+    .viz-sphere-labels {
+        top: 10px;
+        right: 10px;
+        gap: 6px;
+    }
+
+    .viz-sphere-label {
+        padding: 5px 8px;
+        gap: 7px;
+    }
+
+    .viz-sphere-name {
+        font-size: 0.56rem;
+    }
 }
 
 // ── Panel header (title + ? button) ──────────────────────────────────────────

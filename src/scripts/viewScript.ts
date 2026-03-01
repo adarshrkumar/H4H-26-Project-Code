@@ -1,6 +1,6 @@
 /**
  * View-page (Audio to Color) client-side logic.
- * Analyzer ported from gen-music-ref/src/scripts/ViewScript.astro (Gen-Music branch).
+ * Runs in the Vite client and drives canvas + audio analysis.
  *
  * Call `initViewScript()` once the page DOM is ready (e.g. inside useEffect).
  * Returns a cleanup function that stops the audio pipeline.
@@ -444,6 +444,12 @@ export function initViewScript(): () => void {
     const speakerStopBtn  = document.getElementById('speakerStopBtn')  as HTMLButtonElement | null;
     const micStartBtn     = document.getElementById('micStartBtn')     as HTMLButtonElement | null;
     const micStopBtn      = document.getElementById('micStopBtn')      as HTMLButtonElement | null;
+    const sphereLabelEls = {
+        bass: document.getElementById('sphere-val-bass') as HTMLElement | null,
+        lowmid: document.getElementById('sphere-val-lowmid') as HTMLElement | null,
+        mid: document.getElementById('sphere-val-mid') as HTMLElement | null,
+        trebleHigh: document.getElementById('sphere-val-treble-high') as HTMLElement | null,
+    };
 
     // ── Visualization state ───────────────────────────────────────────────────
 
@@ -584,6 +590,26 @@ export function initViewScript(): () => void {
         if (!vizState.sparkRingEnabled) return;
         const minDim = Math.min(cx, cy);
         pulseRings.push({ r: minDim * 0.12, maxR: minDim * 0.92, life: 0, maxLife: 44, hue });
+    }
+
+    function updateSphereLabels(bands: ReturnType<typeof getBands>) {
+        const formatPercent = (value: number) => `${Math.round(Math.max(0, Math.min(1, value)) * 100)}%`;
+        const levels = {
+            bass: bands.ground,
+            lowmid: bands.flow,
+            mid: bands.form,
+            trebleHigh: Math.max(bands.spark, bands.air),
+        };
+
+        sphereLabelEls.bass?.setAttribute('data-level', levels.bass.toFixed(2));
+        sphereLabelEls.lowmid?.setAttribute('data-level', levels.lowmid.toFixed(2));
+        sphereLabelEls.mid?.setAttribute('data-level', levels.mid.toFixed(2));
+        sphereLabelEls.trebleHigh?.setAttribute('data-level', levels.trebleHigh.toFixed(2));
+
+        if (sphereLabelEls.bass) sphereLabelEls.bass.textContent = formatPercent(levels.bass);
+        if (sphereLabelEls.lowmid) sphereLabelEls.lowmid.textContent = formatPercent(levels.lowmid);
+        if (sphereLabelEls.mid) sphereLabelEls.mid.textContent = formatPercent(levels.mid);
+        if (sphereLabelEls.trebleHigh) sphereLabelEls.trebleHigh.textContent = formatPercent(levels.trebleHigh);
     }
 
     // ── Drawing helpers ───────────────────────────────────────────────────────
@@ -839,6 +865,7 @@ export function initViewScript(): () => void {
             ? (COLORBLIND_MAP[currentMoodId] ?? vizState.moodHue)
             : vizState.moodHue;
         const bands = getBands();
+        updateSphereLabels(bands);
 
         // Advance beat grid slot
         if (now - lastGridAdvance > GRID_SLOT_MS) {
@@ -951,6 +978,7 @@ export function initViewScript(): () => void {
         state.prevSpectrum = null;
         state.onsetTimes.length = 0;
         state.energyEMA = 0;
+        updateSphereLabels({ ground: 0, flow: 0, form: 0, spark: 0, air: 0, overall: 0 });
         resetMetricBars();
     }
 

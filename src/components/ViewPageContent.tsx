@@ -1,6 +1,6 @@
 /**
- * Audio-to-Color page
- * Server Component: renders the shell. ViewScriptRunner hydrates the audio engine.
+ * Audio-to-Color page shell for the Vite app.
+ * ViewScriptRunner hydrates the client-side audio engine.
  */
 
 import { METRICS } from '@/lib/metrics';
@@ -17,6 +17,7 @@ export default function ViewPageContent() {
                     {/* ── Top bar ─────────────────────────────────────────── */}
                     <header className="viz-topbar">
                         <span className="viz-topbar__title">Huephonic</span>
+                        <span className="viz-topbar__meta">Vite + API backend</span>
 
                         <nav className="viz-moods" aria-label="Override mood color">
                             {VIEW_MOODS.map(m => (
@@ -101,8 +102,30 @@ export default function ViewPageContent() {
                                 <p className="viz-overlay__text">Choose a source above to begin</p>
                             </div>
                             <div className="viz-hint" id="vizHint">
-                                <p><strong>Circle size</strong> = loudness &nbsp;·&nbsp; <strong>Circle edge</strong> = smooth (bass) or jagged (treble)</p>
+                                <p><strong>Sphere size</strong> = loudness &nbsp;·&nbsp; <strong>Sphere edge</strong> = smooth (bass) or jagged (treble)</p>
                                 <p><strong>Bottom dots</strong> = rhythm pattern &nbsp;·&nbsp; <strong>Left bars</strong> = frequency energy</p>
+                            </div>
+                            <div className="viz-sphere-labels" aria-label="Sphere bands">
+                                <div className="viz-sphere-label" data-band="bass">
+                                    <span className="viz-sphere-dot" aria-hidden="true" />
+                                    <span className="viz-sphere-name">BASS</span>
+                                    <span className="viz-sphere-value" id="sphere-val-bass">0%</span>
+                                </div>
+                                <div className="viz-sphere-label" data-band="lowmid">
+                                    <span className="viz-sphere-dot" aria-hidden="true" />
+                                    <span className="viz-sphere-name">LOWMID</span>
+                                    <span className="viz-sphere-value" id="sphere-val-lowmid">0%</span>
+                                </div>
+                                <div className="viz-sphere-label" data-band="mid">
+                                    <span className="viz-sphere-dot" aria-hidden="true" />
+                                    <span className="viz-sphere-name">MID</span>
+                                    <span className="viz-sphere-value" id="sphere-val-mid">0%</span>
+                                </div>
+                                <div className="viz-sphere-label" data-band="treble-high">
+                                    <span className="viz-sphere-dot" aria-hidden="true" />
+                                    <span className="viz-sphere-name">TREBLE/HIGH</span>
+                                    <span className="viz-sphere-value" id="sphere-val-treble-high">0%</span>
+                                </div>
                             </div>
                         </div>
 
