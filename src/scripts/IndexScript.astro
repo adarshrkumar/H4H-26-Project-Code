@@ -18,6 +18,7 @@
     const WAVEFORM_MIN_ENERGY = 0.01;
     const WAVEFORM_LINE_WIDTH = 0.85;
     const MAX_BEAT_RINGS      = 16;
+    const BORDER_FLASH_MS     = 140;
 
     // Waveform spikiness constants
     const SPIKE_BASE_EXP      = 1.15; // High exponent = smaller quiet sounds (tighter)
@@ -358,7 +359,7 @@
         }
 
         // Intensity (for spikiness): combination of energy, flux, and rms
-        const intensity = Math.min(1, (energy * 0.5 + flux * 0.3 + rms * 0.2) * 1.5);
+        const intensity = Math.min(1, (energy * 0.5 + flux * 0.2 + rms * 0.2) * 1.5);
 
         return {
             energy, brightness, tempo, flux, spread, flatness, bassRatio, zcr,
@@ -378,28 +379,40 @@
     const rings: Ring[] = [];
 
     // ── Mood system ───────────────────────────────────────────────────────────
-    const moodW = { calm: 0.5, energetic: 0, sad: 0, angry: 0, dreamy: 0.5 };
+    const moodW = { calm: 0.34, energetic: 0.10, sad: 0.10, angry: 0.08, dreamy: 0.12 };
+    type MoodKey = keyof typeof moodW;
+    type MoodSelection = 'auto' | MoodKey;
+    let moodOverride: MoodSelection = 'auto';
 
     // Mood → [bassHue, midHue, highHue]
     const MOOD_HUE: Record<keyof typeof moodW, [number, number, number]> = {
         calm:      [250, 180, 200], // slow blue gradients
         energetic: [280,  60,  15], // neon purple, yellow, red
         sad:       [260, 250, 270], // all dark blue/purple
-        angry:     [ 20,  30,   5], // red/orange
+        angry:     [ 34,  42,  28], // orange range
         dreamy:    [300, 195, 320], // pastel purple/cyan/pink
     };
 
     function updateMood(f: Features) {
-        const sm = 0.03;
+        const sm = 0.08;
         const lerp = (a: number, b: number) => a * (1 - sm) + b * sm;
-        moodW.calm      = lerp(moodW.calm,      (1-f.energy)*0.4 + f.harmonicRatio*0.3 + (1-f.tempo)*0.3);
-        moodW.energetic = lerp(moodW.energetic, f.energy*0.5 + f.tempo*0.5);
-        moodW.sad       = lerp(moodW.sad,       (1-f.energy)*0.3 + f.subBass*0.4 + f.flatness*0.3);
-        moodW.angry     = lerp(moodW.angry,     f.energy*0.3 + f.roughness*0.4 + f.spectralContrast*0.3);
-        moodW.dreamy    = lerp(moodW.dreamy,    f.harmonicRatio*0.3 + f.chromaStrength*0.3 + (1-Math.abs(f.energy-0.4))*0.4);
+        const emotionalDrive = Math.min(1, f.intensity * 0.65 + f.tempo * 0.20 + f.roughness * 0.15);
+        moodW.calm      = lerp(moodW.calm,      ((1 - f.energy) * 0.42 + f.harmonicRatio * 0.22 + (1 - f.tempo) * 0.20 + (1 - f.intensity) * 0.16) * (1 - emotionalDrive * 0.40));
+        moodW.energetic = lerp(moodW.energetic, f.energy * 0.46 + f.tempo * 0.33 + f.intensity * 0.21);
+        moodW.sad       = lerp(moodW.sad,       (1 - f.energy) * 0.30 + f.subBass * 0.30 + f.flatness * 0.22 + (1 - f.brightness) * 0.18);
+        moodW.angry     = lerp(moodW.angry,     f.intensity * 0.33 + f.roughness * 0.28 + f.spectralContrast * 0.22 + f.energy * 0.17);
+        moodW.dreamy    = lerp(moodW.dreamy,    f.harmonicRatio * 0.30 + f.chromaStrength * 0.26 + (1 - Math.abs(f.energy - 0.36)) * 0.22 + (1 - f.tempo) * 0.22);
+
+        // Emotional moods should surface more readily than calm.
+        moodW.calm *= 0.96;
+        moodW.energetic *= 1.03;
+        moodW.sad *= 1.02;
+        moodW.angry *= 1.03;
+        moodW.dreamy *= 1.02;
     }
 
     function dominantMood(): keyof typeof moodW {
+        if (moodOverride !== 'auto') return moodOverride;
         let best: keyof typeof moodW = 'calm';
         let bestV = -1;
         for (const k of Object.keys(moodW) as (keyof typeof moodW)[]) {
@@ -409,20 +422,30 @@
     }
 
     function drawColorField(features: Features) {
-        const [bassHue, midHue, highHue] = MOOD_HUE[dominantMood()];
-        const targetL = Math.min(85, Math.max(8, 10 + features.energy * 70));
-        const targetC = Math.min(0.28, Math.max(0.03, 0.05 + features.harmonicRatio * 0.16 + features.flatness * 0.04));
-        const targetH = (midHue * 0.55 + bassHue * 0.25 + highHue * 0.20 + features.pitch * 30 + features.brightness * 22) % 360;
+        const dominant = dominantMood();
+        const [bassHue, midHue, highHue] = MOOD_HUE[dominant];
+        const moodStrength = Math.min(1, moodW[dominant]);
+        const emotionPush = Math.min(1, features.intensity * 0.65 + moodStrength * 0.65);
+        const moodLShift =
+            dominant === 'sad' ? -10 * emotionPush
+                : dominant === 'angry' ? 4 * emotionPush
+                    : dominant === 'energetic' ? 6 * emotionPush
+                        : dominant === 'dreamy' ? 3 * emotionPush : 0;
+        const targetL = Math.min(88, Math.max(6, 12 + features.energy * 66 + moodLShift));
+        const targetC = Math.min(0.36, Math.max(0.04, 0.06 + features.harmonicRatio * 0.14 + features.flatness * 0.04 + emotionPush * 0.12));
+        const baseHue = (midHue * 0.55 + bassHue * 0.25 + highHue * 0.20 + features.pitch * 30 + features.brightness * 22) % 360;
+        const accentHue = dominant === 'angry' ? bassHue : dominant === 'dreamy' ? highHue : midHue;
+        const targetH = (baseHue * (0.78 - emotionPush * 0.20) + accentHue * (0.22 + emotionPush * 0.20)) % 360;
 
-        const ease = 0.14;
+        const ease = 0.22;
         state.pulseLCH.l = state.pulseLCH.l * (1 - ease) + targetL * ease;
         state.pulseLCH.c = state.pulseLCH.c * (1 - ease) + targetC * ease;
 
         const delta = ((targetH - state.pulseLCH.h + 540) % 360) - 180;
         state.pulseLCH.h = (state.pulseLCH.h + delta * ease + 360) % 360;
 
-        const glowL = Math.min(95, state.pulseLCH.l + 8 + features.intensity * 10);
-        const glowC = Math.min(0.32, state.pulseLCH.c + 0.03);
+        const glowL = Math.min(96, state.pulseLCH.l + 8 + features.intensity * 12);
+        const glowC = Math.min(0.40, state.pulseLCH.c + 0.05 + emotionPush * 0.03);
         const gradient = canvasCtx.createRadialGradient(
             canvas.width * 0.5,
             canvas.height * 0.5,
@@ -455,16 +478,51 @@
         canvasCtx.stroke();
     }
 
-    function spawnCenterRing(features: Features) {
+    function spawnCenterRing(features: Features, now: number) {
         const isOnset = features.isBeat || (features.attackTime > 0.24 && features.energy > 0.04);
         if (!isOnset) return;
+        triggerBorderFlash(state.pulseLCH.h);
+
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+        const margin = 24;
+        const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+        // Usually center, but occasionally place rings in feature-driven accents.
+        const centerChance = clamp(0.62 - features.energy * 0.18 + features.beatRegularity * 0.08, 0.35, 0.78);
+        const useCenter = Math.random() < centerChance;
+        let x = cx;
+        let y = cy;
+        if (!useCenter) {
+            const mode = Math.random();
+            if (mode < 0.45) {
+                // Orbit-like placement around center driven by pitch and tempo.
+                const angle = now * 0.0022 + features.pitch * Math.PI * 2;
+                const radius = (0.18 + features.energy * 0.45 + features.flux * 0.20) * Math.min(cx, cy);
+                x = cx + Math.cos(angle) * radius + (Math.random() - 0.5) * radius * 0.12;
+                y = cy + Math.sin(angle * 1.35 + features.tempo * Math.PI) * radius * 0.75;
+            } else if (mode < 0.8) {
+                // Feature-guided accent region (brightness/highs push right/up, bass pushes left/down).
+                const baseX = canvas.width * (0.20 + features.brightness * 0.60);
+                const baseY = canvas.height * (0.18 + (1 - features.subBass) * 0.58);
+                x = baseX + (Math.random() - 0.5) * canvas.width * 0.10;
+                y = baseY + (Math.random() - 0.5) * canvas.height * 0.12;
+            } else if (rings.length > 0) {
+                // Mirror last ring for a call/response feel.
+                const last = rings[rings.length - 1];
+                x = cx + (cx - last.x) * 0.9;
+                y = cy + (cy - last.y) * 0.9;
+            }
+            x = clamp(x, margin, canvas.width - margin);
+            y = clamp(y, margin, canvas.height - margin);
+        }
 
         if (rings.length >= MAX_BEAT_RINGS) rings.shift();
         rings.push({
-            x: canvas.width / 2,
-            y: canvas.height / 2,
+            x,
+            y,
             r: 10,
-            maxR: Math.min(canvas.width, canvas.height) * (0.18 + features.energy * 0.42),
+            maxR: Math.min(canvas.width, canvas.height) * (useCenter ? 0.18 + features.energy * 0.42 : 0.14 + features.energy * 0.34),
             h: state.pulseLCH.h,
         });
     }
@@ -551,8 +609,10 @@
     }
 
     const canvas          = document.getElementById('colorCanvas') as HTMLCanvasElement;
+    const canvasContainer = document.getElementById('canvas-container') as HTMLElement;
     const canvasCtx       = canvas.getContext('2d')!;
     const audioFileInput  = document.getElementById('audioFile') as HTMLInputElement;
+    const moodSelect      = document.getElementById('moodSelect') as HTMLSelectElement | null;
     const speakerStartBtn = document.getElementById('speakerStartBtn') as HTMLButtonElement;
     const speakerStopBtn  = document.getElementById('speakerStopBtn') as HTMLButtonElement;
     const micStartBtn     = document.getElementById('micStartBtn') as HTMLButtonElement;
@@ -571,6 +631,7 @@
     let silentGain:       GainNode | null = null;
     let mediaStream:      MediaStream | null = null;
     let lastVisualFrameTime = 0;
+    let borderFlashTimeout: number | null = null;
 
     async function ensureAudioContext() {
         if (!audioContext || audioContext.state === 'closed') {
@@ -595,6 +656,25 @@
         canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
+    function triggerBorderFlash(hue: number) {
+        if (!canvasContainer) return;
+
+        canvasContainer.style.setProperty('--flash-h', `${Math.round(hue)}`);
+        canvasContainer.dataset.flash = '';
+        // Force restart so rapid beats still flash.
+        void canvasContainer.offsetWidth;
+        canvasContainer.dataset.flash = 'on';
+
+        if (borderFlashTimeout !== null) {
+            window.clearTimeout(borderFlashTimeout);
+        }
+        borderFlashTimeout = window.setTimeout(() => {
+            if (!canvasContainer) return;
+            canvasContainer.dataset.flash = '';
+            borderFlashTimeout = null;
+        }, BORDER_FLASH_MS);
+    }
+
     function stopCapture() {
         if (bufferSource) {
             try { bufferSource.stop(); } catch (_) {}
@@ -607,6 +687,13 @@
         if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
         if (audioContext) audioContext.onstatechange = null;
         if (animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
+        if (borderFlashTimeout !== null) {
+            window.clearTimeout(borderFlashTimeout);
+            borderFlashTimeout = null;
+        }
+        if (canvasContainer) {
+            canvasContainer.dataset.flash = '';
+        }
 
         dataArray       = null;
         timeDomainArray = null;
@@ -639,6 +726,15 @@
             audioFileInput.value = '';
         });
     });
+
+    if (moodSelect) {
+        moodSelect.addEventListener('change', (event) => {
+            const next = (event.target as HTMLSelectElement).value as MoodSelection;
+            if (next === 'auto' || Object.hasOwn(moodW, next)) {
+                moodOverride = next;
+            }
+        });
+    }
 
     audioFileInput.addEventListener('change', async (event) => {
         const file = (event.target as HTMLInputElement).files?.[0];
@@ -754,7 +850,7 @@
         updateInstrumentEstimates(features, now);
         updateMood(features);
         drawColorField(features);
-        spawnCenterRing(features);
+        spawnCenterRing(features, now);
         drawWaveformLine(timeDomainArray!, features);
         drawCenterRings();
 

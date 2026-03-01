@@ -28,6 +28,18 @@ import IndexScript from '../scripts/IndexScript.astro';
         </div>
     </div>
 
+    <div class="mood-picker">
+        <label for="moodSelect">Mood</label>
+        <select id="moodSelect" class="mood-select">
+            <option value="auto" selected>Auto</option>
+            <option value="calm">Calm</option>
+            <option value="energetic">Energetic</option>
+            <option value="sad">Sad</option>
+            <option value="angry">Angry</option>
+            <option value="dreamy">Dreamy</option>
+        </select>
+    </div>
+
     <div id="canvas-container" class="canvas-container">
         <canvas id="colorCanvas" class="color-canvas" width="660" height="340"></canvas>
     </div>

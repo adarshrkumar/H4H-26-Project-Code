@@ -60,6 +60,39 @@ h1 {
     max-width: 660px;
 }
 
+.mood-picker {
+    width: 100%;
+    max-width: 660px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.mood-picker label {
+    font-size: 0.82rem;
+    color: #a8abc9;
+}
+
+.mood-select {
+    appearance: none;
+    padding: 7px 28px 7px 10px;
+    border: 1px solid #3a3e60;
+    border-radius: 8px;
+    background:
+        linear-gradient(45deg, transparent 50%, #9fa8ff 50%) calc(100% - 14px) 52% / 6px 6px no-repeat,
+        linear-gradient(135deg, #9fa8ff 50%, transparent 50%) calc(100% - 10px) 52% / 6px 6px no-repeat,
+        #1a1a30;
+    color: #e6e8ff;
+    font-size: 0.82rem;
+    cursor: pointer;
+}
+
+.mood-select:focus-visible {
+    outline: 2px solid #7d88ff;
+    outline-offset: 1px;
+}
+
 .ctrl-panel { display: none; gap: 10px; align-items: center; }
 .ctrl-panel[data-state="active"] { display: flex; }
 
@@ -100,6 +133,7 @@ h1 {
     width: min(100%, 660px);
     display: flex;
     justify-content: center;
+    --flash-h: 200;
 }
 
 // Canvas
@@ -112,6 +146,24 @@ h1 {
     display: block;
     position: relative;
     z-index: 2;
+}
+
+.canvas-container[data-flash="on"] .color-canvas {
+    animation: border-flash 140ms ease-out;
+}
+
+@keyframes border-flash {
+    0% {
+        border-color: oklch(86% 0.26 var(--flash-h));
+        box-shadow:
+            0 0 0 1px oklch(86% 0.28 var(--flash-h) / 0.95),
+            0 0 22px oklch(84% 0.30 var(--flash-h) / 0.82);
+    }
+
+    100% {
+        border-color: #252540;
+        box-shadow: none;
+    }
 }
 
 // Instrument Results Panel
