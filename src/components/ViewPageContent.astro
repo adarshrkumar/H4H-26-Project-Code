@@ -43,6 +43,8 @@ const { music, audioUrl, errorMessage } = Astro.props;
                 <div id="ctrl-file" class="ctrl-panel" data-state="active">
                     <label for="audioFile">Audio file</label>
                     <input type="file" id="audioFile" accept="audio/*" />
+                    <button type="button" class="btn" id="startVisualizerBtn">Start Visualization</button>
+                    <button type="button" class="btn stop" id="stopVisualizerBtn" disabled>Stop</button>
                 </div>
                 <div id="ctrl-speaker" class="ctrl-panel">
                     <button type="button" class="btn" id="speakerStartBtn">Start Capture</button>
