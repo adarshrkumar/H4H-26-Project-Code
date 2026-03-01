@@ -1,25 +1,24 @@
-import { Music } from '@elevenlabs/elevenlabs-js';
+import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
+import 'dotenv/config';
 
-let _music: Music | null = null;
-function getMusic(): Music {
-    if (!_music) {
-        const apiKey =
-            (import.meta as unknown as { env: Record<string, string> }).env?.ELEVENLABS_API_KEY ??
-            process.env.ELEVENLABS_API_KEY;
-        _music = new Music({ apiKey });
-    }
-    return _music;
-}
+const elevenlabs = new ElevenLabsClient({
+    apiKey:
+        (import.meta as unknown as { env: Record<string, string> }).env?.ELEVENLABS_API_KEY ??
+        process.env.ELEVENLABS_API_KEY,
+});
 
-/**
- * Generates a single music track from a text prompt.
- * For per-section generation, use generateAndSave() from generate-and-save.ts instead.
- */
-export async function generateMusic(prompt: string, musicLengthMs?: number): Promise<Buffer> {
-    const stream = await getMusic().compose({
+export async function generateCompositionPlan(prompt: string, musicLengthMs?: number) {
+    return elevenlabs.music.compositionPlan.create({
         prompt,
         ...(musicLengthMs !== undefined && { musicLengthMs }),
+    });
+}
+
+export async function generateMusic(prompt: string, musicLengthMs?: number): Promise<Buffer> {
+    const stream = await elevenlabs.music.compose({
+        prompt,
         outputFormat: 'mp3_44100_128',
+        ...(musicLengthMs !== undefined && { musicLengthMs }),
     });
 
     const reader = stream.getReader();

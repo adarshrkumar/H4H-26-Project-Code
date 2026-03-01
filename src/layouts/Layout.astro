@@ -7,7 +7,7 @@
  * - Global styles applied via import in the head
  */
 
-import { siteConfig } from '@/lib/config';
+import config from '@/lib/config';
 
 interface Props {
     pageTitle?: string | string[];
@@ -16,7 +16,7 @@ interface Props {
 
 const {
     pageTitle,
-    description = siteConfig.description,
+    description = config.description,
 } = Astro.props;
 
 const pageArray = Array.isArray(pageTitle) ? pageTitle : [pageTitle];
@@ -24,7 +24,7 @@ const pageArray = Array.isArray(pageTitle) ? pageTitle : [pageTitle];
 const firstElement = pageArray?.[0];
 const shouldSkipFirst =
     firstElement === '' ||
-    firstElement === siteConfig.name ||
+    firstElement === config.name ||
     firstElement?.toLowerCase() === 'index' ||
     firstElement?.toLowerCase() === 'home';
 
@@ -34,7 +34,7 @@ const newPageTitle = (pageArray && pageArray.length > 0 && firstElement)
         : pageArray
     : null;
 
-const title = (newPageTitle && newPageTitle.length > 0) ? `${newPageTitle.join(' | ')} | ${siteConfig.name}` : siteConfig.name;
+const title = (newPageTitle && newPageTitle.length > 0) ? `${newPageTitle.join(' | ')} | ${config.name}` : config.name;
 ---
 
 <!doctype html>
