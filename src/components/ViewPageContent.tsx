@@ -1,20 +1,10 @@
-import { useEffect, useRef } from 'react';
 import ViewScriptRunner from '@/components/ViewScriptRunner';
-import { navigateTo } from '@/lib/navigate';
 import '@/styles/pages/view.scss';
 
 export default function ViewPageContent() {
-    const backBtnRef = useRef<HTMLButtonElement>(null);
-    useEffect(() => {
-        const btn = backBtnRef.current;
-        if (!btn) return;
-        const handler = () => navigateTo('compose');
-        btn.addEventListener('click', handler);
-        return () => btn.removeEventListener('click', handler);
-    }, []);
     return (
         <div className="view-page" enable-xr={true}>
-            <button ref={backBtnRef} type="button" className="btn secondary" onClick={() => navigateTo('compose')}>← Back</button>
+            <a href="#" className="btn secondary">← Back</a>
             <h1>Audio to Color</h1>
 
             <div id="mode-tabs" className="mode-tabs">

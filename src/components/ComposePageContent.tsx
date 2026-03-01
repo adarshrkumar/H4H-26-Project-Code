@@ -1,6 +1,4 @@
-import { useEffect, useRef } from 'react';
 import IndexScriptRunner from '@/components/IndexScriptRunner';
-import { navigateTo } from '@/lib/navigate';
 import '@/styles/pages/index.scss';
 
 const moods = [
@@ -32,14 +30,6 @@ const sections = [
 ];
 
 export default function ComposePageContent() {
-    const viewBtnRef = useRef<HTMLButtonElement>(null);
-    useEffect(() => {
-        const btn = viewBtnRef.current;
-        if (!btn) return;
-        const handler = () => { console.log('[nav] view btn clicked'); navigateTo('view'); };
-        btn.addEventListener('click', handler);
-        return () => btn.removeEventListener('click', handler);
-    }, []);
     return (
         <>
             <div className="compose-page" enable-xr={true}>
@@ -48,7 +38,7 @@ export default function ComposePageContent() {
                 <header className="compose-header">
                     <h1 className="compose-header__title">🎵 Compose Your Music</h1>
                     <p className="compose-header__subtitle">Express your rhythm. Shape your feeling. Build your story — your way.</p>
-                    <button ref={viewBtnRef} type="button" className="btn secondary" onClick={() => navigateTo('view')}>🎨 Audio Visualizer</button>
+                    <a href="#/view" className="btn secondary">🎨 Audio Visualizer</a>
                 </header>
 
                 {/* ── Step 1 · Mood ─────────────────────────────────── */}
