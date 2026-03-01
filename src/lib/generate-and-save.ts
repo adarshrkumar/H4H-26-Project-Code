@@ -175,13 +175,13 @@ export async function generateAndSave(input: GenerateAndSavePayload): Promise<Ge
         throw new GenerateAndSaveError('Failed to upload audio', 500);
     }
 
-    // Step 4: persist to Convex
-    console.log('[generate-and-save] step 4: saving to Convex');
+    // Step 4: persist to Neon
+    console.log('[generate-and-save] step 4: saving to Neon');
     try {
         await saveTrack({ id: fileKey, title: songTitle, artist: input.artist, mimeType: 'audio/mpeg', fileKey, fileUrl });
-        console.log('[generate-and-save] step 4: Convex save done');
+        console.log('[generate-and-save] step 4: Neon save done');
     } catch (err) {
-        console.error('[generate-and-save] step 4: Convex insert failed', err);
+        console.error('[generate-and-save] step 4: Neon insert failed', err);
     }
 
     return {
