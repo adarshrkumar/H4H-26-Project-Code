@@ -181,15 +181,7 @@ export async function generateAndSave(input: GenerateAndSavePayload): Promise<Ge
     console.log('[generate-and-save] step 4: saving to Neon, songId:', songId);
     try {
         await saveSong({ id: songId, title: songTitle, artist: input.artist });
-        await addFileToSong({
-            id:          fileKey,
-            musicId:     songId,
-            fileKey,
-            fileUrl,
-            mimeType:    'audio/mpeg',
-            sectionName: input.sectionName,
-            position:    input.position ?? 0,
-        });
+        await addFileToSong({ musicId: songId, fileKey, fileUrl });
         console.log('[generate-and-save] step 4: Neon save done');
     } catch (err) {
         console.error('[generate-and-save] step 4: Neon insert failed', err);

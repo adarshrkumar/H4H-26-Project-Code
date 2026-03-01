@@ -2,12 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import '@/styles/pages/view.scss';
 
 interface SongFile {
-    id: string;
     fileKey: string;
-    fileUrl: string | null;
-    mimeType: string | null;
-    sectionName: string | null;
-    position: number;
+    fileUrl: string;
 }
 
 interface Song {
@@ -112,15 +108,10 @@ export default function ViewPageContent() {
                         <p className="view-page__state">No audio files available.</p>
                     )}
 
-                    {song.files.map(f => (
-                        <div key={f.id} className="view-page__section">
-                            {f.sectionName && (
-                                <p className="view-page__section-label">{f.sectionName}</p>
-                            )}
-                            {f.fileUrl
-                                ? <audio className="view-page__audio" src={f.fileUrl} controls />
-                                : <p className="view-page__state">No audio for this section.</p>
-                            }
+                    {song.files.map((f, i) => (
+                        <div key={f.fileKey} className="view-page__section">
+                            <p className="view-page__section-label">Part {i + 1}</p>
+                            <audio className="view-page__audio" src={f.fileUrl} controls />
                         </div>
                     ))}
                 </div>
