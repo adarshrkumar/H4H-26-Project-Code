@@ -1,0 +1,91 @@
+// ── View / Track Player Page ──────────────────────────────────────────────────
+
+.view-page {
+    width: 100%;
+    min-height: 100vh;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    gap: 24px;
+}
+
+.view-page__glass {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border-radius: 24px;
+    pointer-events: none;
+    --xr-background-material: transparent;
+    --xr-back: -10;
+}
+
+.view-page__back {
+    position: absolute;
+    top: 28px;
+    left: 32px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #666;
+    text-decoration: none;
+    transition: color 0.15s;
+    z-index: 1;
+
+    &:hover {
+        color: #ccc;
+    }
+}
+
+.view-page__state {
+    color: #555;
+    font-size: 1rem;
+    text-align: center;
+    position: relative;
+    z-index: 1;
+
+    &--error {
+        color: #f87171;
+    }
+}
+
+.view-page__card {
+    position: relative;
+    z-index: 1;
+    background-color: #0e0e20;
+    border: 1px solid #1e1e3a;
+    border-radius: 20px;
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    width: 100%;
+    max-width: 560px;
+}
+
+.view-page__meta {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    text-align: center;
+}
+
+.view-page__title {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: #fff;
+    line-height: 1.2;
+}
+
+.view-page__artist {
+    font-size: 1rem;
+    color: #666;
+    margin: 0;
+}
+
+.view-page__audio {
+    width: 100%;
+    height: 44px;
+    accent-color: #e94560;
+}

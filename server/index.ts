@@ -2,8 +2,11 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import { z } from 'zod';
+import { eq } from 'drizzle-orm';
 import { toNodeHandler } from 'better-auth/node';
 import { auth } from '../src/lib/auth';
+import { db } from '../src/db/initialize';
+import { music } from '../src/db/schema';
 import { generateAndSave, GenerateAndSaveError } from '../src/lib/generate-and-save';
 import { generateSongBlueprint, generateSectionPlan, type SongBlueprint } from '../src/lib/generate-section-plan';
 
@@ -14,6 +17,14 @@ app.use(cors({ origin: process.env.VITE_APP_URL ?? 'http://localhost:5173' }));
 app.all('/api/auth/*', toNodeHandler(auth));
 
 app.use(express.json());
+
+// GET /api/track/:id
+app.get('/api/track/:id', async (req, res) => {
+    const { id } = req.params;
+    const rows = await db.select().from(music).where(eq(music.id, id)).limit(1);
+    if (rows.length === 0) { res.status(404).json({ error: 'Track not found' }); return; }
+    res.json(rows[0]);
+});
 
 // POST /api/generate-blueprint
 const blueprintSchema = z.object({
