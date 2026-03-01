@@ -194,11 +194,12 @@ export function initIndexScript(): () => void {
         }
     }
 
-    async function generateSection(sectionId: SectionId, globals: { songConcept: string; songStyle: string; mood: string }, blueprint: Blueprint | null): Promise<{ url: string; id: string }> {
+    async function generateSection(sectionId: SectionId, globals: { songConcept: string; songStyle: string; mood: string; musicId: string }, blueprint: Blueprint | null): Promise<{ url: string; id: string }> {
         const selectedEnergy = document.querySelector<HTMLButtonElement>(`.energy-card[data-section="${sectionId}"].selected`);
         const energyValue = selectedEnergy?.dataset.value ?? '';
         const lyrics      = (document.getElementById(`lyrics-${sectionId}`) as HTMLTextAreaElement | null)?.value.trim() ?? '';
         const customText  = (document.getElementById(`text-${sectionId}`) as HTMLTextAreaElement | null)?.value.trim() ?? '';
+        const position    = SECTION_IDS.indexOf(sectionId);
 
         const res = await fetch('/api/generate-section', {
             method: 'POST',
@@ -213,6 +214,8 @@ export function initIndexScript(): () => void {
                 songConcept:  globals.songConcept,
                 songStyle:    globals.songStyle,
                 mood:         globals.mood,
+                musicId:      globals.musicId,
+                position,
                 blueprint,
             }),
         });
@@ -236,7 +239,8 @@ export function initIndexScript(): () => void {
 
         const songConcept = (document.getElementById('song-concept') as HTMLInputElement | null)?.value.trim() ?? '';
         const songStyle   = (document.getElementById('song-style')   as HTMLInputElement | null)?.value.trim() ?? '';
-        const globals = { songConcept, songStyle, mood: selectedMood };
+        const musicId     = crypto.randomUUID();
+        const globals = { songConcept, songStyle, mood: selectedMood, musicId };
 
         btn.disabled = true;
         resultEl.innerHTML = '';
@@ -284,9 +288,8 @@ export function initIndexScript(): () => void {
             }
         }
 
-        const lastId = generatedIds.at(-1)?.trackId ?? '';
-        const viewBtn = lastId
-            ? `<a class="btn view-page-btn" href="#/view?id=${encodeURIComponent(lastId)}">🎧 Listen to Full Song</a>`
+        const viewBtn = doneCount > 0
+            ? `<a class="btn view-page-btn" href="#/view?id=${encodeURIComponent(musicId)}">🎧 Listen to Full Song</a>`
             : '';
 
         if (errorCount === 0) {

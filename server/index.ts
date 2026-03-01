@@ -2,11 +2,9 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import { z } from 'zod';
-import { eq } from 'drizzle-orm';
 import { toNodeHandler } from 'better-auth/node';
 import { auth } from '../src/lib/auth';
-import { db } from '../src/db/initialize';
-import { music } from '../src/db/schema';
+import { getSongWithFiles } from '../src/db/helpers';
 import { generateAndSave, GenerateAndSaveError } from '../src/lib/generate-and-save';
 import { generateSongBlueprint, generateSectionPlan, type SongBlueprint } from '../src/lib/generate-section-plan';
 
@@ -20,10 +18,9 @@ app.use(express.json());
 
 // GET /api/track/:id
 app.get('/api/track/:id', async (req, res) => {
-    const { id } = req.params;
-    const rows = await db.select().from(music).where(eq(music.id, id)).limit(1);
-    if (rows.length === 0) { res.status(404).json({ error: 'Track not found' }); return; }
-    res.json(rows[0]);
+    const song = await getSongWithFiles(req.params.id);
+    if (!song) { res.status(404).json({ error: 'Track not found' }); return; }
+    res.json(song);
 });
 
 // POST /api/generate-blueprint
@@ -56,6 +53,8 @@ const generateSectionSchema = z.object({
     songConcept: z.string().max(500).default(''),
     songStyle:   z.string().max(500).default(''),
     mood:        z.string().max(200).default(''),
+    musicId:     z.string().max(100).optional(),
+    position:    z.number().int().min(0).optional(),
     blueprint: z.object({
         key: z.string(), bpm: z.number().int(),
         coreInstruments: z.array(z.string()), sonicCharacter: z.string(),
@@ -83,7 +82,13 @@ app.post('/api/generate-section', async (req, res) => {
         prompts: [sectionPrompt],
     };
     try {
-        const result = await generateAndSave({ plan, title: payload.sectionName });
+        const result = await generateAndSave({
+            plan,
+            title:       payload.sectionName,
+            musicId:     payload.musicId,
+            sectionName: payload.sectionName,
+            position:    payload.position,
+        });
         res.status(201).json(result);
     } catch (err) {
         if (err instanceof GenerateAndSaveError) {

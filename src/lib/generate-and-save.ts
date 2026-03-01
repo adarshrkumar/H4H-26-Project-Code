@@ -29,7 +29,8 @@ export interface GenerateAndSavePayload {
 }
 
 export interface GenerateAndSaveResult {
-    id: string;
+    id: string;       // song/music ID
+    fileId: string;   // individual file ID (fileKey)
     creationTime: number;
     title: string;
     artist?: string;
@@ -176,16 +177,27 @@ export async function generateAndSave(input: GenerateAndSavePayload): Promise<Ge
     }
 
     // Step 4: persist to Neon
-    console.log('[generate-and-save] step 4: saving to Neon');
+    const songId = input.musicId ?? fileKey;  // use provided musicId or fall back to fileKey
+    console.log('[generate-and-save] step 4: saving to Neon, songId:', songId);
     try {
-        await saveTrack({ id: fileKey, title: songTitle, artist: input.artist, mimeType: 'audio/mpeg', fileKey, fileUrl });
+        await saveSong({ id: songId, title: songTitle, artist: input.artist });
+        await addFileToSong({
+            id:          fileKey,
+            musicId:     songId,
+            fileKey,
+            fileUrl,
+            mimeType:    'audio/mpeg',
+            sectionName: input.sectionName,
+            position:    input.position ?? 0,
+        });
         console.log('[generate-and-save] step 4: Neon save done');
     } catch (err) {
         console.error('[generate-and-save] step 4: Neon insert failed', err);
     }
 
     return {
-        id: fileKey,
+        id: songId,
+        fileId: fileKey,
         creationTime: Date.now(),
         title: songTitle,
         artist: input.artist,
