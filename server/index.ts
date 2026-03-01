@@ -121,5 +121,9 @@ app.post('/api/generate', async (req, res) => {
     }
 });
 
-const port = Number(process.env.API_PORT ?? 3001);
-app.listen(port, () => console.log(`API server running on :${port}`));
+if (process.env.NODE_ENV !== 'production') {
+    const port = Number(process.env.API_PORT ?? 3001);
+    app.listen(port, () => console.log(`API server running on :${port}`));
+}
+
+export default app;
