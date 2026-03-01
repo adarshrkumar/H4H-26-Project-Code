@@ -644,9 +644,9 @@
         ptcls.length        = 0;
         shakeAmt            = 0;
         state.energyHistory.length = 0;
-        pcmCount = 0;
-        pcmPos   = 0;
-        setInstrumentStatus('—', '');
+        // pcmCount = 0;
+        // pcmPos   = 0;
+        // setInstrumentStatus('—', '');
         resetCanvas();
         resetMetricBars();
     }
@@ -768,14 +768,14 @@
         analyser.getByteFrequencyData(dataArray!);
         analyser.getByteTimeDomainData(timeDomainArray!);
 
-        // ── Instrument classification ─────────────────────────────────────────
-        appendPCM(downsampleChunk(timeDomainArray!, state.sampleRate));
-        const classifyNow = performance.now();
-        if (classifierReady && !classifying && pcmCount >= PCM_16K_LEN / 2
-                && classifyNow - lastClassifyTime > CLASSIFY_EVERY_MS) {
-            lastClassifyTime = classifyNow;
-            runClassification();
-        }
+        // ── Instrument classification (disabled) ──────────────────────────────
+        // appendPCM(downsampleChunk(timeDomainArray!, state.sampleRate));
+        // const classifyNow = performance.now();
+        // if (classifierReady && !classifying && pcmCount >= PCM_16K_LEN / 2
+        //         && classifyNow - lastClassifyTime > CLASSIFY_EVERY_MS) {
+        //     lastClassifyTime = classifyNow;
+        //     runClassification();
+        // }
 
         const features = getAudioFeatures(dataArray!, timeDomainArray!);
         updateMood(features);
@@ -867,5 +867,5 @@
         updateMetricBars(numericFeatures);
     }
 
-    initClassifier();
+    // initClassifier();
 </script>
