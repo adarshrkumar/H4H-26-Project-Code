@@ -10,8 +10,8 @@ npm run dev          # Astro dev server on port 4321
 npm run convex       # Convex backend dev server
 
 # Build & Check
-npm run build        # astro check && astro build
-npm run check        # astro check && stylelint && astro build
+npm run build        # type-check + build (no SCSS lint)
+npm run check        # type-check + stylelint + build (full CI check)
 npm run stylelint:fix  # Auto-fix SCSS lint issues
 
 # Testing (Playwright E2E)

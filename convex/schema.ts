@@ -13,6 +13,6 @@ export default defineSchema({
         source: v.optional(v.string()),
         mimeType: v.optional(v.string()),
         uploadedAt: v.number(),
-    }).index('by_id', ['id']),
+    }).index('by_music_id', ['id']),
 
 });
