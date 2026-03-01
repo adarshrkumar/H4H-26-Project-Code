@@ -2,17 +2,12 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import { z } from 'zod';
-import { toNodeHandler } from 'better-auth/node';
-import { auth } from '../src/lib/auth';
 import { getSongWithFiles } from '../src/db/helpers';
 import { generateAndSave, GenerateAndSaveError } from '../src/lib/generate-and-save';
 import { generateSongBlueprint, generateSectionPlan, type SongBlueprint } from '../src/lib/generate-section-plan';
 
 const app = express();
 app.use(cors({ origin: process.env.VITE_APP_URL ?? 'http://localhost:5173' }));
-
-// Auth must come before express.json()
-app.all('/api/auth/*', toNodeHandler(auth));
 
 app.use(express.json());
 
