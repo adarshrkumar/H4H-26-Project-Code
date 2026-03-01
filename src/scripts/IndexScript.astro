@@ -171,45 +171,6 @@
         });
     });
 
-    // ── Combined prompt builder ────────────────────────────────────────────────
-
-    function buildCombinedPrompt(): string {
-        const concept = (document.getElementById('song-concept') as HTMLInputElement | null)?.value.trim();
-        const style   = (document.getElementById('song-style')   as HTMLInputElement | null)?.value.trim();
-
-        const parts: string[] = [];
-
-        // Song-wide identity — locks in key, tempo, genre for the whole track
-        const identity: string[] = [];
-        if (selectedMood) identity.push(selectedMood);
-        if (style)        identity.push(style);
-        if (concept)      identity.push(`song theme: ${concept}`);
-        identity.push('consistent musical key, BPM, timbre, and instrumentation throughout the entire song');
-        parts.push(identity.join(', '));
-
-        // Full structure overview
-        const structure = SECTION_IDS.map(id => SECTION_LABELS[id]).join(' → ');
-        parts.push(`compose a complete song with this structure: ${structure}`);
-
-        // Per-section details
-        for (const id of SECTION_IDS) {
-            const selectedEnergy = document.querySelector<HTMLButtonElement>(
-                `.energy-card[data-section="${id}"].selected`
-            );
-            const energyValue = selectedEnergy?.dataset.value ?? '';
-            const customText  = (document.getElementById(`text-${id}`) as HTMLTextAreaElement | null)?.value.trim() ?? '';
-            const lyrics      = (document.getElementById(`lyrics-${id}`) as HTMLTextAreaElement | null)?.value.trim() ?? '';
-
-            const sectionParts: string[] = [SECTION_MUSICAL_ROLE[id]];
-            if (energyValue) sectionParts.push(energyValue);
-            if (customText)  sectionParts.push(customText);
-            if (lyrics)      sectionParts.push(`vocals/lyrics: "${lyrics}"`);
-
-            parts.push(`[${SECTION_LABELS[id]}] ${sectionParts.join(', ')}`);
-        }
-
-        return parts.join('. ');
-    }
 
     // ── Generate Full Song ─────────────────────────────────────────────────────
 
