@@ -194,7 +194,7 @@ export function initIndexScript(): () => void {
         }
     }
 
-    async function generateSection(sectionId: SectionId, globals: { songConcept: string; songStyle: string; mood: string }, blueprint: Blueprint | null): Promise<string> {
+    async function generateSection(sectionId: SectionId, globals: { songConcept: string; songStyle: string; mood: string }, blueprint: Blueprint | null): Promise<{ url: string; id: string }> {
         const selectedEnergy = document.querySelector<HTMLButtonElement>(`.energy-card[data-section="${sectionId}"].selected`);
         const energyValue = selectedEnergy?.dataset.value ?? '';
         const lyrics      = (document.getElementById(`lyrics-${sectionId}`) as HTMLTextAreaElement | null)?.value.trim() ?? '';
@@ -224,8 +224,9 @@ export function initIndexScript(): () => void {
         }
 
         const audioUrl = (body.file as Record<string, unknown> | undefined)?.url as string ?? '';
+        const trackId  = typeof body.id === 'string' ? body.id : '';
         if (!audioUrl) throw new Error('No audio URL returned.');
-        return audioUrl;
+        return { url: audioUrl, id: trackId };
     }
 
     async function generateFullSong() {
@@ -246,6 +247,7 @@ export function initIndexScript(): () => void {
 
         let doneCount  = 0;
         let errorCount = 0;
+        const generatedIds: { sectionId: SectionId; trackId: string }[] = [];
 
         for (const id of SECTION_IDS) {
             const statusEl = document.getElementById(`status-${id}`);
@@ -253,8 +255,9 @@ export function initIndexScript(): () => void {
             btn.textContent = `⟳ Generating ${SECTION_LABELS[id]}…`;
 
             try {
-                const url = await generateSection(id, globals, blueprint);
+                const { url, id: trackId } = await generateSection(id, globals, blueprint);
                 doneCount++;
+                if (trackId) generatedIds.push({ sectionId: id, trackId });
 
                 if (statusEl) setStatus(statusEl, 'done', '✓ Ready');
                 updateMapSegment(id);
@@ -265,8 +268,11 @@ export function initIndexScript(): () => void {
                     playerDiv.className = 'section-audio-player';
                     playerDiv.innerHTML = `
                         <audio class="section-result__audio" controls src="${url}" preload="metadata"></audio>
-                        <a class="btn secondary small section-result__download"
-                           href="${url}" download="${id}.mp3">⬇ Download</a>
+                        <div class="section-audio-actions">
+                            <a class="btn secondary small section-result__download"
+                               href="${url}" download="${id}.mp3">⬇ Download</a>
+                            ${trackId ? `<a class="btn secondary small" href="#/view?id=${encodeURIComponent(trackId)}">▶ Open in Player</a>` : ''}
+                        </div>
                     `;
                     blockEl.querySelector('.section-audio-player')?.remove();
                     blockEl.appendChild(playerDiv);
@@ -278,14 +284,19 @@ export function initIndexScript(): () => void {
             }
         }
 
+        const lastId = generatedIds.at(-1)?.trackId ?? '';
+        const viewBtn = lastId
+            ? `<a class="btn view-page-btn" href="#/view?id=${encodeURIComponent(lastId)}">🎧 Listen to Full Song</a>`
+            : '';
+
         if (errorCount === 0) {
-            resultEl.innerHTML = `<div class="section-result"><p class="section-result__label">All ${doneCount} sections generated.</p></div>`;
+            resultEl.innerHTML = `<div class="section-result"><p class="section-result__label">All ${doneCount} sections generated.</p>${viewBtn}</div>`;
             btn.textContent = '✨ Regenerate All Sections';
         } else if (doneCount === 0) {
             resultEl.innerHTML = `<div class="section-result error"><p class="section-result__error-msg">⚠ All sections failed to generate.</p></div>`;
             btn.textContent = '✨ Try Again';
         } else {
-            resultEl.innerHTML = `<div class="section-result"><p class="section-result__label">${doneCount} section(s) ready, ${errorCount} failed.</p></div>`;
+            resultEl.innerHTML = `<div class="section-result"><p class="section-result__label">${doneCount} section(s) ready, ${errorCount} failed.</p>${viewBtn}</div>`;
             btn.textContent = '✨ Regenerate All Sections';
         }
 

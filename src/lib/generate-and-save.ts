@@ -1,7 +1,7 @@
 import { Music } from '@elevenlabs/elevenlabs-js';
 import { generateCompositionPlan } from './eleven-labs';
 import { uploadFile, getFileUrl } from './uploadthing';
-import { saveTrack } from '@db/helpers';
+import { saveSong, addFileToSong } from '@db/helpers';
 
 export interface SectionPrompt {
     sectionName: string;
@@ -23,6 +23,9 @@ export interface GenerateAndSavePayload {
     title?: string;
     artist?: string;
     musicLengthMs?: number;
+    musicId?: string;       // parent song ID (groups sections together)
+    sectionName?: string;   // e.g. 'Intro', 'Verse 1'
+    position?: number;      // section order (0-based)
 }
 
 export interface GenerateAndSaveResult {

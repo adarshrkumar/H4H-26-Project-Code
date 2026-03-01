@@ -884,6 +884,18 @@ body {
     }
 }
 
+// ── Section audio actions row ─────────────────────────────────────────────────
+
+.section-audio-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.view-page-btn {
+    margin-top: 12px;
+}
+
 // ── Combine Step ──────────────────────────────────────────────────────────────
 
 .combine-controls {

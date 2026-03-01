@@ -89,3 +89,70 @@
     height: 44px;
     accent-color: #e94560;
 }
+
+// ── Source tabs ───────────────────────────────────────────────────────────────
+
+.view-tabs {
+    display: flex;
+    gap: 8px;
+}
+
+.view-tab {
+    flex: 1;
+    padding: 9px 12px;
+    background-color: #0b0b1e;
+    border: 1.5px solid #1e1e3a;
+    border-radius: 10px;
+    color: #555;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s, background-color 0.2s;
+
+    &:hover {
+        border-color: #333;
+        color: #aaa;
+    }
+
+    &--active {
+        border-color: #e94560;
+        color: #fff;
+        background-color: rgb(233 69 96 / 8%);
+    }
+}
+
+// ── Input panel ───────────────────────────────────────────────────────────────
+
+.view-input-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+
+    &__actions {
+        display: flex;
+        gap: 10px;
+    }
+}
+
+.view-file-input {
+    font-size: 0.88rem;
+    color: #888;
+
+    &::file-selector-button {
+        padding: 8px 16px;
+        background-color: #14142e;
+        border: 1.5px solid #2a2a48;
+        border-radius: 8px;
+        color: #aaa;
+        font-size: 0.82rem;
+        font-weight: 700;
+        cursor: pointer;
+        margin-right: 12px;
+        transition: background-color 0.15s, color 0.15s;
+
+        &:hover {
+            background-color: #1a1a3a;
+            color: #fff;
+        }
+    }
+}

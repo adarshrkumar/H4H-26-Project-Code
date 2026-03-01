@@ -32,14 +32,14 @@ const sections = [
 export default function GeneratePageContent() {
     return (
         <>
-            <div className="compose-page">
+            <div className="generate-page">
                 {/* Spatial glass background — enable-xr only on this inert layer */}
-                <div className="compose-page__glass" enable-xr={true} />
+                <div className="generate-page__glass" enable-xr={true} />
 
                 {/* ── Header ──────────────────────────────────────────── */}
-                <header className="compose-header">
-                    <h1 className="compose-header__title">🎵 Compose Your Music</h1>
-                    <p className="compose-header__subtitle">Express your rhythm. Shape your feeling. Build your story — your way.</p>
+                <header className="generate-header">
+                    <h1 className="generate-header__title">🎵 Compose Your Music</h1>
+                    <p className="generate-header__subtitle">Express your rhythm. Shape your feeling. Build your story — your way.</p>
                     <a href="#/view" className="btn secondary">🎨 Audio Visualizer</a>
                 </header>
 

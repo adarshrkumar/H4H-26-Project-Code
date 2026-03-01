@@ -57,7 +57,7 @@ npm run ts <file.ts> # node --experimental-strip-types
 | `src/components/IndexScriptRunner.tsx` | `'use client'` runner for compose page |
 | `src/components/ViewScriptRunner.tsx` | `'use client'` runner for audio page |
 | `src/components/ViewSpatialSpheres.tsx` | 3D spatial spheres for XR `/view` |
-| `src/scripts/indexScript.ts` | `initIndexScript()` — all compose-page DOM/fetch logic |
+| `src/scripts/indexScript.ts` | `initIndexScript()` — all generate-page DOM/fetch logic |
 | `src/scripts/viewScript.ts` | `initViewScript()` — Web Audio pipeline, returns cleanup fn |
 
 **Key path aliases** (from `tsconfig.json`):
