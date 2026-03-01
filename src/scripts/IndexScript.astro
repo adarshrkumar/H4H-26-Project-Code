@@ -802,22 +802,6 @@
         const n        = layerHistory.length;
         const barWidth = canvas.width / NUM_HISTORY;
 
-        // ── A. Frequency layers (bass → mid → high, back to front) ────────────
-        for (const [band, heightScale, opacityMax] of [
-            ['bass', 1.2, 0.88],
-            ['mid',  1.0, 0.80],
-            ['high', 0.7, 0.70],
-        ] as [keyof LayerFrame, number, number][]) {
-            for (let i = 0; i < n; i++) {
-                const fr    = layerHistory[i][band];
-                const x     = canvas.width - (n - i) * barWidth;
-                const alpha = Math.min(1, i / (NUM_HISTORY * 0.15)) * opacityMax;
-                const bh    = Math.max(2, Math.pow(fr.e, 0.7) * canvas.height * heightScale);
-                canvasCtx.fillStyle = `oklch(${fr.l}% ${fr.c} ${fr.h} / ${alpha})`;
-                canvasCtx.fillRect(x, (canvas.height - bh) / 2, barWidth + 1, bh);
-            }
-        }
-
         // ── B. Waveform — colored by frequency layers ─────────────────────────
         if (timeDomainArray && features.energy > MIN_THRESHOLD) {
             const frame = layerHistory[layerHistory.length - 1];
