@@ -442,6 +442,26 @@
 
     type Features = ReturnType<typeof getAudioFeatures>;
 
+    // ── Waveform — scrolling live envelope + tonal color ─────────────────────
+    const waveHistory: { min: number; max: number }[] = [];
+    const waveColor = { l: 60, c: 0.18, h: 200 };
+    function updateWaveColor(f: Features) {
+        const sm   = 0.02; // very slow — ignores transient beats
+        const lerp = (a: number, b: number) => a * (1 - sm) + b * sm;
+        // Hue from dominant pitch + chroma, not from band energy
+        const targetH = (f.dominantPitch * 360 + f.brightness * 120) % 360;
+        const targetL = 45 + f.harmonicRatio * 30 + f.chromaStrength * 15;
+        const targetC = 0.12 + f.chromaStrength * 0.20 + f.tonnetz * 0.10;
+        waveColor.l = lerp(waveColor.l, targetL);
+        waveColor.c = lerp(waveColor.c, targetC);
+        // Hue via vector to avoid wrap-around jumps
+        const tx = Math.cos(targetH * Math.PI / 180);
+        const ty = Math.sin(targetH * Math.PI / 180);
+        const wx = Math.cos(waveColor.h * Math.PI / 180) * (1 - sm) + tx * sm;
+        const wy = Math.sin(waveColor.h * Math.PI / 180) * (1 - sm) + ty * sm;
+        waveColor.h = (Math.atan2(wy, wx) * 180 / Math.PI + 360) % 360;
+    }
+
     // ── A. Layered frequency-color bars ──────────────────────────────────────
     type LayerBand  = { e: number; l: number; c: number; h: number };
     type LayerFrame = { bass: LayerBand; mid: LayerBand; high: LayerBand };
@@ -639,8 +659,9 @@
         micStartBtn.disabled     = false;
         micStopBtn.disabled      = true;
 
-        layerHistory.length = 0;
-        rings.length        = 0;
+        layerHistory.length  = 0;
+        waveHistory.length   = 0;
+        rings.length         = 0;
         ptcls.length        = 0;
         shakeAmt            = 0;
         state.energyHistory.length = 0;
@@ -779,6 +800,7 @@
 
         const features = getAudioFeatures(dataArray!, timeDomainArray!);
         updateMood(features);
+        updateWaveColor(features);
 
         const cx = canvas.width  / 2;
         const cy = canvas.height / 2;
@@ -802,25 +824,26 @@
         const n        = layerHistory.length;
         const barWidth = canvas.width / NUM_HISTORY;
 
-        // ── B. Waveform — colored by frequency layers ─────────────────────────
-        if (timeDomainArray && features.energy > MIN_THRESHOLD) {
-            const frame = layerHistory[layerHistory.length - 1];
-            const step  = canvas.width / timeDomainArray.length;
-            for (const { band, alpha } of [
-                { band: 'bass' as const, alpha: 0.50 },
-                { band: 'mid'  as const, alpha: 0.65 },
-                { band: 'high' as const, alpha: 0.45 },
-            ]) {
-                const fr = frame[band];
-                canvasCtx.strokeStyle = `oklch(${fr.l}% ${fr.c} ${fr.h} / ${alpha})`;
-                canvasCtx.lineWidth   = band === 'mid' ? 1.5 : 1;
-                canvasCtx.beginPath();
-                for (let i = 0; i < timeDomainArray.length; i++) {
-                    const v = (timeDomainArray[i] / 128) - 1;
-                    const y = cy + v * cy * 0.75;
-                    i === 0 ? canvasCtx.moveTo(0, y) : canvasCtx.lineTo(i * step, y);
-                }
-                canvasCtx.stroke();
+        // ── B. Live scrolling waveform (tonal color, beat-independent) ────────
+        if (timeDomainArray) {
+            let mn = 1, mx = -1;
+            for (let i = 0; i < timeDomainArray.length; i++) {
+                const v = (timeDomainArray[i] - 128) / 128;
+                if (v < mn) mn = v;
+                if (v > mx) mx = v;
+            }
+            waveHistory.push({ min: mn, max: mx });
+            if (waveHistory.length > NUM_HISTORY) waveHistory.shift();
+
+            const bw = canvas.width / NUM_HISTORY;
+            for (let i = 0; i < waveHistory.length; i++) {
+                const { min, max } = waveHistory[i];
+                const x     = canvas.width - (waveHistory.length - i) * bw;
+                const yTop  = cy + max * cy * 0.85;
+                const yBot  = cy + min * cy * 0.85;
+                const alpha = Math.min(1, i / (NUM_HISTORY * 0.15)) * 0.85;
+                canvasCtx.fillStyle = `oklch(${waveColor.l}% ${waveColor.c} ${waveColor.h} / ${alpha})`;
+                canvasCtx.fillRect(x, yTop, bw + 1, Math.max(1, yBot - yTop));
             }
         }
 
