@@ -531,15 +531,15 @@
 
     const lchHistory: { l: number; c: number; h: number }[] = [];
 
-    let audioContext:     AudioContext | null = null;
-    let analyser:         AnalyserNode | null = null;
-    let dataArray:        Uint8Array | null = null;
-    let timeDomainArray:  Uint8Array | null = null;
-    let animationFrameId: number | null = null;
+    let audioContext:     AudioContext | null                                               = null;
+    let analyser:         AnalyserNode | null                                               = null;
+    let dataArray:        Uint8Array | null                                                 = null;
+    let timeDomainArray:  Uint8Array | null                                                 = null;
+    let animationFrameId: number | null                                                     = null;
     let sourceNode:       (MediaStreamAudioSourceNode | MediaElementAudioSourceNode) | null = null;
-    let bufferSource:     AudioBufferSourceNode | null = null;
-    let silentGain:       GainNode | null = null;
-    let mediaStream:      MediaStream | null = null;
+    let bufferSource:     AudioBufferSourceNode | null                                      = null;
+    let silentGain:       GainNode | null                                                   = null;
+    let mediaStream:      MediaStream | null                                                = null;
 
     async function ensureAudioContext() {
         if (!audioContext || audioContext.state === 'closed') {
@@ -715,21 +715,37 @@
         try {
             const sourceAudio = document.getElementById('sourceAudio') as HTMLAudioElement;
             if (!sourceAudio) {
+                console.error('Audio element not found');
                 alert('Audio element not found');
                 return;
             }
+            
+            console.log('Audio element found, src:', sourceAudio.src);
+            
             await ensureAudioContext();
             setupAnalyser();
+            
             sourceNode = audioContext!.createMediaElementSource(sourceAudio);
             sourceNode!.connect(analyser!);
             analyser!.connect(audioContext!.destination);
-            sourceAudio.play();
+            
+            console.log('Audio context setup complete, attempting to play...');
+            
+            try {
+                await sourceAudio.play();
+                console.log('Audio playing successfully');
+            } catch (playErr) {
+                console.error('Audio play failed:', playErr);
+                alert('Could not play audio: ' + String(playErr));
+                return;
+            }
+            
             startVisualBtn.disabled = true;
             stopVisualBtn.disabled = false;
             if (!animationFrameId) drawVisualization();
         } catch (err: unknown) {
             console.error('Audio setup error:', err);
-            alert('Could not start visualization');
+            alert('Could not start visualization: ' + String(err));
         }
     });
 
