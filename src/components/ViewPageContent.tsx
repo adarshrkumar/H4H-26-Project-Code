@@ -1,5 +1,3 @@
-'use client';
-
 import ViewScriptRunner from '@/components/ViewScriptRunner';
 import '@/styles/pages/view.scss';
 

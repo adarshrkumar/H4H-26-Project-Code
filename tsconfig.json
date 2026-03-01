@@ -1,12 +1,8 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": [
-      "ES2022",
-      "DOM",
-      "DOM.Iterable"
-    ],
-    "jsx": "preserve",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
     "jsxImportSource": "@webspatial/react-sdk",
     "strict": true,
     "esModuleInterop": true,
@@ -20,35 +16,12 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "src/*"
-      ],
-      "@db/*": [
-        "src/db/*"
-      ],
-      "@styles/*": [
-        "src/styles/*"
-      ],
-      "@components/*": [
-        "src/components/*"
-      ]
-    },
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
-    "incremental": true
+      "@/*": ["src/*"],
+      "@db/*": ["src/db/*"],
+      "@styles/*": ["src/styles/*"],
+      "@components/*": ["src/components/*"]
+    }
   },
-  "include": [
-    ".next/types/**/*.ts",
-    "next-env.d.ts",
-    "src/**/*",
-    ".next/webspatial/avp/types/**/*.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    ".astro"
-  ]
+  "include": ["src/**/*", "server/**/*", "vite.config.ts"],
+  "exclude": ["node_modules", "dist"]
 }

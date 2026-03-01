@@ -1,6 +1,4 @@
-'use client';
-
-import Link from 'next/link';
+import { Link } from 'react-router-dom';
 import IndexScriptRunner from '@/components/IndexScriptRunner';
 import '@/styles/pages/index.scss';
 
