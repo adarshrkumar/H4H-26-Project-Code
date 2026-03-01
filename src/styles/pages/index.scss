@@ -13,7 +13,7 @@
 
 body {
     background-color: #06060f;
-    font-family: system-ui, sans-serif;
+    font-family: $font-family-base;
     color: #e0e0e0;
     min-height: 100vh;
 }
@@ -648,7 +648,6 @@ body {
         border: 1.5px solid #1e1e3a;
         border-radius: 10px;
         font-size: 0.88rem;
-        font-family: Georgia, serif;
         color: #ccc;
         resize: vertical;
         line-height: 1.75;
@@ -666,7 +665,6 @@ body {
 // ── Chapter card lyrics ───────────────────────────────────────────────────────
 
 .chapter-card__lyrics {
-    font-family: Georgia, serif;
     font-size: 0.78rem;
     color: #555;
     line-height: 1.75;
