@@ -289,6 +289,10 @@ html.is-spatial {
 
     --xr-background-material: transparent;
 
+    body {
+        background-color: transparent;
+    }
+
     .view-page {
         --xr-background-material: translucent;
 

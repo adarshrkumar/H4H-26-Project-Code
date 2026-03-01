@@ -70,7 +70,7 @@ const sections = [
 export default function ComposePage() {
     return (
         <>
-            <div className="compose-page" enable-xr={true}>
+            <div className="compose-page" enable-xr={"true" as unknown as boolean}>
 
                 {/* ── Header ──────────────────────────────────────────── */}
                 <header className="compose-header">
@@ -89,7 +89,7 @@ export default function ComposePage() {
                             <button
                                 key={m.value}
                                 className="mood-btn"
-                                enable-xr={true}
+                                enable-xr={"true" as unknown as boolean}
                                 data-mood={m.value}
                                 data-color={m.color}
                                 data-pulse={m.pulse}

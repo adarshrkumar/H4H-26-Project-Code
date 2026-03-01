@@ -12,10 +12,10 @@ export const metadata: Metadata = { title: config.name };
 
 export default function ViewPage() {
     return (
-        <div className="view-page" enable-xr={true}>
+        <div className="view-page" enable-xr={"true" as unknown as boolean}>
             <h1>Audio to Color</h1>
 
-            <div id="mode-tabs" className="mode-tabs" enable-xr={true}>
+            <div id="mode-tabs" className="mode-tabs" enable-xr={"true" as unknown as boolean}>
                 <button type="button" className="tab" data-state="active" data-mode="file">File</button>
                 <button type="button" className="tab" data-mode="speaker">Speaker / Tab</button>
                 <button type="button" className="tab" data-mode="microphone">Microphone</button>
@@ -41,7 +41,7 @@ export default function ViewPage() {
             <p id="mood" className="mood"></p>
 
             {/* Metric rows are injected dynamically by viewScript.ts */}
-            <div id="metrics" className="metrics" enable-xr={true}></div>
+            <div id="metrics" className="metrics" enable-xr={"true" as unknown as boolean}></div>
 
             <ViewScriptRunner />
         </div>
