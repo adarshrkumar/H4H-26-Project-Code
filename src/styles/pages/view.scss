@@ -20,6 +20,11 @@ body {
     min-height: 100vh;
     padding: 24px 16px 40px;
     gap: 18px;
+    position: relative;
+    border-radius: 24px;
+
+    // WebSpatial: translucent glass panel floating in visionOS space
+    --xr-background-material: translucent;
 }
 
 h1 {
@@ -36,6 +41,11 @@ h1 {
     background-color: #1a1a30;
     padding: 5px;
     border-radius: 10px;
+    position: relative;
+
+    // WebSpatial: thick glass, elevated 20pt in front of the view panel
+    --xr-background-material: thick;
+    --xr-back: 20;
 }
 
 .tab {
@@ -135,6 +145,11 @@ h1 {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 10px 28px;
+    position: relative;
+
+    // WebSpatial: translucent panel elevated 10pt in front of the view panel
+    --xr-background-material: translucent;
+    --xr-back: 10;
 }
 
 @media (max-width: 480px) {
@@ -282,35 +297,5 @@ h1 {
     background-color: #f9ca24;
 }
 
-// ── Spatial overrides (WebSpatial App Shell only) ─────────────────────────────
-
-html.is-spatial {
-    background-color: transparent;
-
-    --xr-background-material: transparent;
-
-    body {
-        background-color: transparent;
-    }
-
-    .view-page {
-        --xr-background-material: translucent;
-
-        border-radius: 24px;
-        position: relative;
-    }
-
-    .mode-tabs {
-        --xr-background-material: thick;
-
-        position: relative;
-    }
-
-    .metrics {
-        --xr-background-material: translucent;
-
-        position: relative;
-
-        --xr-back: 10;
-    }
-}
+// ── Spatial properties are set directly on elements above (WebSpatial reads
+//    --xr-background-material from computed styles, never adds html.is-spatial) ──

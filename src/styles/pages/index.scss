@@ -27,6 +27,10 @@ body {
     flex-direction: column;
     gap: 36px;
     position: relative;
+    border-radius: 24px;
+
+    // WebSpatial: translucent glass panel floating in visionOS space
+    --xr-background-material: translucent;
 
     // Ambient radial glow that shifts with mood
     &::before {
@@ -134,6 +138,10 @@ body {
     cursor: pointer;
     transition: border-color 0.25s, background-color 0.25s, transform 0.18s;
     color: #bbb;
+
+    // WebSpatial: thick glass, elevated 30pt in front of the compose panel
+    --xr-background-material: thick;
+    --xr-back: 30;
 
     &[data-pulse='sharp'] {
         --btn-color: #ff4500;
@@ -1077,29 +1085,5 @@ body {
     }
 }
 
-// ── Spatial overrides (WebSpatial App Shell only) ──────────────────────────────
-
-html.is-spatial {
-    background-color: transparent;
-
-    --xr-background-material: transparent;
-
-    body {
-        background-color: transparent;
-    }
-
-    .compose-page {
-        --xr-background-material: translucent;
-
-        border-radius: 24px;
-        position: relative;
-    }
-
-    .mood-btn {
-        --xr-background-material: thick;
-
-        position: relative;
-
-        --xr-back: 10;
-    }
-}
+// ── Spatial properties are set directly on elements above (WebSpatial reads
+//    --xr-background-material from computed styles, never adds html.is-spatial) ──

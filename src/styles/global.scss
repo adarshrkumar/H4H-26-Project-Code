@@ -24,6 +24,9 @@ html {
     color: $text-primary;
     background-color: $bg-primary;
 
+    // WebSpatial: make the root visionOS window transparent so spatial panels float freely
+    --xr-background-material: transparent;
+
     @include smooth-scroll;
 }
 
