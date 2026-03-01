@@ -61,6 +61,7 @@ Generate:
         model: anthropic('claude-haiku-4-5-20251001'),
         schema: sectionPromptSchema,
         prompt,
+        temperature: 1,
     });
 
     return {
