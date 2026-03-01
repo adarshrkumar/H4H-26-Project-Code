@@ -3,6 +3,7 @@ import type { APIRoute } from 'astro';
 import { z } from 'zod';
 import { Music } from '@elevenlabs/elevenlabs-js';
 import { uploadFile, getFileUrl } from '@/lib/uploadthing';
+import { createRecording } from '@/db/helpers.ts';
 
 const OUTPUT_FORMAT = 'mp3_44100_128' as const;
 
@@ -93,6 +94,25 @@ export const POST: APIRoute = async ({ request }) => {
     } catch (err) {
         console.error('[api/generate] UploadThing error:', err);
         return Response.json({ error: 'Failed to upload audio' }, { status: 500 });
+    }
+
+    // Save to database
+    try {
+        await createRecording({
+            id: fileKey,
+            title: songTitle,
+            artist: payload.artist ?? undefined,
+            prompt: payload.text,
+            source: 'elevenlabs',
+            mimeType: 'audio/mpeg',
+            file: {
+                key: fileKey,
+                url: fileUrl,
+            },
+        });
+    } catch (err) {
+        console.error('[api/generate] Database save error:', err);
+        return Response.json({ error: 'Failed to save track to database' }, { status: 500 });
     }
 
     return Response.json({
