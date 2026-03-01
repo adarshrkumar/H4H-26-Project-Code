@@ -176,7 +176,23 @@
 
     document.getElementById('generate-song-btn')?.addEventListener('click', generateFullSong);
 
-    async function generateSection(sectionId: SectionId, globals: { songConcept: string; songStyle: string; mood: string }): Promise<string> {
+    type Blueprint = { key: string; bpm: number; coreInstruments: string[]; sonicCharacter: string };
+
+    async function generateBlueprint(globals: { songConcept: string; songStyle: string; mood: string }): Promise<Blueprint | null> {
+        try {
+            const res = await fetch('/api/generate-blueprint', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(globals),
+            });
+            if (!res.ok) return null;
+            return await res.json() as Blueprint;
+        } catch {
+            return null;
+        }
+    }
+
+    async function generateSection(sectionId: SectionId, globals: { songConcept: string; songStyle: string; mood: string }, blueprint: Blueprint | null): Promise<string> {
         const selectedEnergy = document.querySelector<HTMLButtonElement>(`.energy-card[data-section="${sectionId}"].selected`);
         const energyValue = selectedEnergy?.dataset.value ?? '';
         const lyrics      = (document.getElementById(`lyrics-${sectionId}`) as HTMLTextAreaElement | null)?.value.trim() ?? '';
@@ -195,6 +211,7 @@
                 songConcept:  globals.songConcept,
                 songStyle:    globals.songStyle,
                 mood:         globals.mood,
+                blueprint,
             }),
         });
 
