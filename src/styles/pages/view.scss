@@ -59,7 +59,7 @@ $metric-colors: (
 }
 
 // ── Reset body for full-screen layout ────────────────────────────────────────
-body {
+body:has(.view-scene-wrapper) {
     margin: 0;
     padding: 0;
     overflow: hidden;
