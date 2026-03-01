@@ -1,167 +1,238 @@
-import { useEffect, useRef, useState } from 'react';
+/**
+ * Audio-to-Color page shell for the Vite app.
+ * ViewScriptRunner hydrates the client-side audio engine.
+ */
+
+import { METRICS } from '@/lib/metrics';
+import { VIEW_MOODS, VIEW_LAYERS } from '@/lib/config';
+import ViewScriptRunner from '@/components/ViewScriptRunner';
+import ViewSpatialSpheres from '@/components/ViewSpatialSpheres';
 import '@/styles/pages/view.scss';
-
-interface SongFile {
-    fileKey: string;
-    fileUrl: string;
-}
-
-interface Song {
-    id: string;
-    title: string | null;
-    artist: string | null;
-    uploadedAt: string;
-    files: SongFile[];
-}
-
-function getIdFromHash(): string | null {
-    const hash = window.location.hash;
-    const qIndex = hash.indexOf('?');
-    if (qIndex === -1) return null;
-    return new URLSearchParams(hash.slice(qIndex + 1)).get('id');
-}
-
-type InputMode = 'file' | 'speaker' | 'mic';
+import { useEffect, useState } from 'react';
 
 export default function ViewPageContent() {
-    // ── DB song (when id is in URL) ───────────────────────────────────────────
-    const [song, setSong] = useState<Song | null>(null);
-    const [loadError, setLoadError] = useState<string | null>(null);
-    const [loading, setLoading] = useState(true);
-    const hasId = !!getIdFromHash();
+    const [hasUserInteracted, setHasUserInteracted] = useState(false);
+    const isXrTransparentView =
+        typeof window !== 'undefined' &&
+        new URLSearchParams(window.location.search).get('xr') === '1';
 
     useEffect(() => {
-        const id = getIdFromHash();
-        if (!id) { setLoading(false); return; }
+        const bodyClass = 'view-xr-transparent';
+        if (isXrTransparentView) document.body.classList.add(bodyClass);
+        else document.body.classList.remove(bodyClass);
+        return () => document.body.classList.remove(bodyClass);
+    }, [isXrTransparentView]);
 
-        fetch(`/api/track/${encodeURIComponent(id)}`)
-            .then(r => r.ok ? r.json() : r.json().then((e: { error: string }) => Promise.reject(e.error)))
-            .then((data: Song) => { setSong(data); setLoading(false); })
-            .catch((e: unknown) => {
-                setLoadError(typeof e === 'string' ? e : 'Failed to load track.');
-                setLoading(false);
-            });
-    }, []);
+    useEffect(() => {
+        if (!isXrTransparentView || hasUserInteracted) return;
 
-    // ── Manual input (when no id) ─────────────────────────────────────────────
-    const [mode, setMode] = useState<InputMode>('file');
-    const audioRef = useRef<HTMLAudioElement>(null);
-    const streamRef = useRef<MediaStream | null>(null);
+        const markInteracted = () => setHasUserInteracted(true);
+        window.addEventListener('pointerdown', markInteracted, { once: true, passive: true });
+        window.addEventListener('keydown', markInteracted, { once: true });
 
-    function stopStream() {
-        streamRef.current?.getTracks().forEach(t => t.stop());
-        streamRef.current = null;
-        if (audioRef.current) { audioRef.current.srcObject = null; audioRef.current.pause(); }
-    }
-
-    function switchMode(m: InputMode) {
-        stopStream();
-        if (audioRef.current) audioRef.current.src = '';
-        setMode(m);
-    }
-
-    function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-        const file = e.target.files?.[0];
-        if (!file || !audioRef.current) return;
-        audioRef.current.srcObject = null;
-        audioRef.current.src = URL.createObjectURL(file);
-        audioRef.current.play();
-    }
-
-    async function startSpeaker() {
-        try {
-            stopStream();
-            const stream = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: false } as DisplayMediaStreamOptions);
-            streamRef.current = stream;
-            if (audioRef.current) { audioRef.current.src = ''; audioRef.current.srcObject = stream; audioRef.current.play(); }
-        } catch { /* user cancelled */ }
-    }
-
-    async function startMic() {
-        try {
-            stopStream();
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            streamRef.current = stream;
-            if (audioRef.current) { audioRef.current.src = ''; audioRef.current.srcObject = stream; audioRef.current.play(); }
-        } catch { /* user cancelled */ }
-    }
-
-    useEffect(() => () => stopStream(), []);
+        return () => {
+            window.removeEventListener('pointerdown', markInteracted);
+            window.removeEventListener('keydown', markInteracted);
+        };
+    }, [isXrTransparentView, hasUserInteracted]);
 
     return (
-        <div className="view-page">
-            <div className="view-page__glass" enable-xr={true} />
-            <a className="view-page__back" href="#/">← Back</a>
+        <div className="view-scene-wrapper">
+            <div className={`view-page${isXrTransparentView ? ' view-page--xr' : ''}`}>
+                <div className="viz-page">
 
-            {/* ── DB song player ──────────────────────────────────────── */}
-            {loading && <p className="view-page__state">Loading track…</p>}
-            {loadError && <p className="view-page__state view-page__state--error">{loadError}</p>}
+                    {/* ── Top bar ─────────────────────────────────────────── */}
+                    <header className="viz-topbar">
+                        <span className="viz-topbar__title">Huephonic</span>
+                        <span className="viz-topbar__meta">Vite + API backend</span>
 
-            {!loading && song && (
-                <div className="view-page__card">
-                    <div className="view-page__meta">
-                        <h1 className="view-page__title">{song.title ?? 'Untitled'}</h1>
-                        {song.artist && <p className="view-page__artist">{song.artist}</p>}
-                    </div>
+                        <nav className="viz-moods" aria-label="Override mood color">
+                            {VIEW_MOODS.map(m => (
+                                <button
+                                    key={m.id}
+                                    type="button"
+                                    className="viz-mood-btn"
+                                    data-mood={m.id}
+                                    data-hue={m.hue}
+                                    aria-pressed="false"
+                                >
+                                    <span className="viz-mood-btn__icon">{m.icon}</span>
+                                    <span className="viz-mood-btn__label">{m.label}</span>
+                                </button>
+                            ))}
+                        </nav>
 
-                    {song.files.length === 0 && (
-                        <p className="view-page__state">No audio files available.</p>
-                    )}
+                        <div className="viz-input-bar">
+                            <div className="viz-tabs" role="tablist" aria-label="Audio source">
+                                <button type="button" className="viz-tab" data-state="active" data-mode="file"    role="tab" aria-selected="true">File</button>
+                                <button type="button" className="viz-tab" data-mode="speaker"                     role="tab" aria-selected="false">Speaker / Tab</button>
+                                <button type="button" className="viz-tab" data-mode="mic"                         role="tab" aria-selected="false">Microphone</button>
+                            </div>
 
-                    {song.files.map((f, i) => (
-                        <div key={f.fileKey} className="view-page__section">
-                            <p className="view-page__section-label">Part {i + 1}</p>
-                            <audio className="view-page__audio" src={f.fileUrl} controls />
+                            <div className="viz-input-panels">
+                                <div id="panel-file" className="viz-input-panel" data-state="active">
+                                    <label htmlFor="vizFileInput" className="sr-only">Audio file</label>
+                                    <input type="file" id="vizFileInput" accept="audio/*" />
+                                </div>
+                                <div id="panel-speaker" className="viz-input-panel">
+                                    <button type="button" className="viz-btn" id="speakerStartBtn">Share Tab Audio</button>
+                                    <button type="button" className="viz-btn viz-btn--ghost" id="speakerStopBtn" disabled>Stop</button>
+                                </div>
+                                <div id="panel-mic" className="viz-input-panel">
+                                    <button type="button" className="viz-btn" id="micStartBtn">Use Microphone</button>
+                                    <button type="button" className="viz-btn viz-btn--ghost" id="micStopBtn" disabled>Stop</button>
+                                </div>
+                            </div>
                         </div>
-                    ))}
-                </div>
-            )}
 
-            {/* ── Manual input (no id in URL) ──────────────────────────── */}
-            {!loading && !hasId && (
-                <div className="view-page__card">
-                    <div className="view-page__meta">
-                        <h1 className="view-page__title">Audio Player</h1>
-                        <p className="view-page__artist">Choose a source to get started</p>
-                    </div>
+                        <div className="viz-playback">
+                            <button type="button" className="viz-btn" id="vizPauseBtn" disabled>Pause</button>
+                            <button type="button" className="viz-btn viz-btn--ghost" id="vizResetBtn">Reset</button>
+                        </div>
+                    </header>
 
-                    <div className="view-tabs">
-                        {(['file', 'speaker', 'mic'] as InputMode[]).map(m => (
-                            <button
-                                key={m}
-                                type="button"
-                                className={`view-tab${mode === m ? ' view-tab--active' : ''}`}
-                                onClick={() => switchMode(m)}
-                            >
-                                {m === 'file' ? '📁 File' : m === 'speaker' ? '🔊 Tab Audio' : '🎙 Microphone'}
-                            </button>
-                        ))}
-                    </div>
+                    {/* ── Main ────────────────────────────────────────────── */}
+                    <main className="viz-main">
 
-                    <div className="view-input-panel">
-                        {mode === 'file' && (
-                            <label className="view-file-label">
-                                <span className="sr-only">Choose audio file</span>
-                                <input type="file" accept="audio/*" onChange={handleFile} className="view-file-input" aria-label="Choose audio file" />
+                        {/* Left: Energy layer toggles */}
+                        <aside className="viz-panel viz-panel--left" aria-label="Energy layers">
+                            <p className="viz-panel__title">Energy Layers</p>
+                            <p className="viz-panel__hint">Toggle each layer to show or hide its frequency band in the visualization.</p>
+                            {VIEW_LAYERS.map(l => (
+                                <div key={l.id} className="viz-layer" id={`layer-wrap-${l.id}`} data-active="true">
+                                    <input
+                                        type="checkbox"
+                                        className="viz-layer__toggle"
+                                        id={`toggle-${l.id}`}
+                                        data-layer={l.id}
+                                        defaultChecked
+                                    />
+                                    <label htmlFor={`toggle-${l.id}`}>
+                                        <span className="viz-layer__icon">{l.icon}</span>
+                                        <div className="viz-layer__text">
+                                            <span className="viz-layer__name">{l.name}</span>
+                                            <span className="viz-layer__freq">{l.freq}</span>
+                                        </div>
+                                        <div className="viz-layer__preview" aria-hidden="true">
+                                            {Array.from({ length: 5 }, (_, i) => <span key={i} />)}
+                                        </div>
+                                    </label>
+                                </div>
+                            ))}
+                        </aside>
+
+                        {/* Center: canvas */}
+                        <div className="viz-canvas-wrap">
+                            <canvas id="viz-canvas" />
+                            <div id="viz-am-hidden" aria-hidden="true" />
+                            <div className="viz-overlay" id="vizOverlay" data-state="idle">
+                                <p className="viz-overlay__text">Choose a source above to begin</p>
+                            </div>
+                            <div className="viz-hint" id="vizHint">
+                                <p><strong>Spheres</strong> grow with bass, lowmid, mid, treble/high.</p>
+                            </div>
+                            {isXrTransparentView && hasUserInteracted ? <ViewSpatialSpheres /> : null}
+                            <div className="viz-sphere-labels" aria-label="Sphere bands">
+                                <div className="viz-sphere-label" data-band="bass">
+                                    <span className="viz-sphere-dot" aria-hidden="true" />
+                                    <span className="viz-sphere-name">BASS</span>
+                                    <span className="viz-sphere-value" id="sphere-val-bass">0%</span>
+                                </div>
+                                <div className="viz-sphere-label" data-band="lowmid">
+                                    <span className="viz-sphere-dot" aria-hidden="true" />
+                                    <span className="viz-sphere-name">LOWMID</span>
+                                    <span className="viz-sphere-value" id="sphere-val-lowmid">0%</span>
+                                </div>
+                                <div className="viz-sphere-label" data-band="mid">
+                                    <span className="viz-sphere-dot" aria-hidden="true" />
+                                    <span className="viz-sphere-name">MID</span>
+                                    <span className="viz-sphere-value" id="sphere-val-mid">0%</span>
+                                </div>
+                                <div className="viz-sphere-label" data-band="treble-high">
+                                    <span className="viz-sphere-dot" aria-hidden="true" />
+                                    <span className="viz-sphere-name">TREBLE/HIGH</span>
+                                    <span className="viz-sphere-value" id="sphere-val-treble-high">0%</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Right: visual options + metrics */}
+                        <aside className="viz-panel viz-panel--right" aria-label="Visual options">
+                            <div className="viz-panel__header">
+                                <p className="viz-panel__title">Visual Options</p>
+                                <button
+                                    type="button"
+                                    id="vizHelpBtn"
+                                    className="viz-help-btn"
+                                    aria-expanded="false"
+                                    aria-controls="vizHelpDrop"
+                                    title="What do these controls do?"
+                                >?</button>
+                            </div>
+
+                            <div className="viz-help-drop" id="vizHelpDrop">
+                                <div className="viz-help-section">
+                                    <p className="viz-help-heading">Quick guide</p>
+                                    <dl className="viz-help-list">
+                                        <dt>Spheres</dt>
+                                        <dd>Each sphere matches one band: bass, lowmid, mid, treble/high.</dd>
+                                        <dt>Bars</dt>
+                                        <dd>Longer bars mean stronger energy in that band.</dd>
+                                        <dt>Spark Ring</dt>
+                                        <dd>Pulse effect on beat hits.</dd>
+                                    </dl>
+                                </div>
+                            </div>
+
+                            <label className="viz-opt-toggle">
+                                <input type="checkbox" className="viz-switch" id="sparkRingToggle" defaultChecked />
+                                <span>Spark Ring</span>
                             </label>
-                        )}
-                        {mode === 'speaker' && (
-                            <div className="view-input-panel__actions">
-                                <button type="button" className="btn" onClick={startSpeaker}>Share Tab Audio</button>
-                                <button type="button" className="btn secondary" onClick={stopStream}>Stop</button>
-                            </div>
-                        )}
-                        {mode === 'mic' && (
-                            <div className="view-input-panel__actions">
-                                <button type="button" className="btn" onClick={startMic}>Use Microphone</button>
-                                <button type="button" className="btn secondary" onClick={stopStream}>Stop</button>
-                            </div>
-                        )}
-                    </div>
+                            <label className="viz-opt-toggle">
+                                <input type="checkbox" className="viz-switch" id="highContrast" />
+                                <span>High Contrast</span>
+                            </label>
+                            <label className="viz-opt-toggle">
+                                <input type="checkbox" className="viz-switch" id="colorblindMode" />
+                                <span>Colorblind Mode</span>
+                            </label>
+                            <label className="viz-opt-toggle">
+                                <input type="checkbox" className="viz-switch" id="reduceMotion" />
+                                <span>Reduce Motion</span>
+                            </label>
+                            <label className="viz-opt-toggle">
+                                <input type="checkbox" className="viz-switch" id="smoothMode" />
+                                <span>Smooth Mode</span>
+                            </label>
 
-                    <audio ref={audioRef} className="view-page__audio" controls />
+                            <div className="viz-pulse-wrap">
+                                <span className="viz-panel__title">Beat Pulse</span>
+                                <div className="viz-pulse-preview" id="vizPulsePreview" aria-hidden="true" />
+                            </div>
+
+                            {!isXrTransparentView ? (
+                                <>
+                                    <p className="viz-panel__title">Metrics</p>
+                                    <div id="metrics" className="metrics">
+                                        {METRICS.map(({ key, label }) => (
+                                            <div key={key} className="metric-panel">
+                                                <div className="metric-panel__header">
+                                                    <span className="metric-label" data-metric={key}>{label}</span>
+                                                    <span className="metric-value" id={`val-${key}`}>0.00</span>
+                                                </div>
+                                                <canvas className="metric-graph" id={`graph-${key}`} width={400} height={60} />
+                                            </div>
+                                        ))}
+                                    </div>
+                                </>
+                            ) : null}
+                        </aside>
+
+                    </main>
                 </div>
-            )}
+
+                <ViewScriptRunner />
+            </div>
         </div>
     );
 }
