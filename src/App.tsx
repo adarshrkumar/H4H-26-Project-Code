@@ -9,6 +9,7 @@ export default function App() {
 
     useEffect(() => {
         const handler = () => setPage(window.location.hash === '#/view' ? 'view' : 'compose');
+        handler(); // sync on mount in case hash is already set
         window.addEventListener('hashchange', handler);
         return () => window.removeEventListener('hashchange', handler);
     }, []);

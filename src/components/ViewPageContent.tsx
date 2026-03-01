@@ -4,7 +4,7 @@ import '@/styles/pages/view.scss';
 export default function ViewPageContent() {
     return (
         <div className="view-page" enable-xr={true}>
-            <a href="#" className="btn secondary">← Back</a>
+            <a href="#/compose" className="btn secondary">← Back</a>
             <h1>Audio to Color</h1>
 
             <div id="mode-tabs" className="mode-tabs">
