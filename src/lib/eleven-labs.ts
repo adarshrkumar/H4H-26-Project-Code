@@ -1,10 +1,7 @@
 import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
-import 'dotenv/config';
 
 const elevenlabs = new ElevenLabsClient({
-    apiKey:
-        (import.meta as unknown as { env: Record<string, string> }).env?.ELEVENLABS_API_KEY ??
-        process.env.ELEVENLABS_API_KEY,
+    apiKey: process.env.ELEVENLABS_API_KEY,
 });
 
 export async function generateCompositionPlan(prompt: string, musicLengthMs?: number) {

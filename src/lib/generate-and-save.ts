@@ -1,4 +1,3 @@
-import 'dotenv/config';
 import { Music } from '@elevenlabs/elevenlabs-js';
 import { generateCompositionPlan } from './eleven-labs';
 import { uploadFile, getFileUrl } from './uploadthing';
@@ -59,9 +58,7 @@ const OUTPUT_FORMAT = 'mp3_44100_128' as const;
 let _music: Music | null = null;
 function getMusic(): Music {
     if (!_music) {
-        const apiKey =
-            (import.meta as unknown as { env: Record<string, string> }).env?.ELEVENLABS_API_KEY ??
-            process.env.ELEVENLABS_API_KEY;
+        const apiKey = process.env.ELEVENLABS_API_KEY;
         console.log('[generate-and-save] ElevenLabs API key present:', !!apiKey);
         _music = new Music({ apiKey });
     }

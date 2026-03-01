@@ -11,6 +11,6 @@ export const auth = betterAuth({
     emailAndPassword: {
         enabled: true,
     },
-    baseURL: import.meta.env.BETTER_AUTH_URL || process.env.BETTER_AUTH_URL,
-    secret: import.meta.env.BETTER_AUTH_SECRET || process.env.BETTER_AUTH_SECRET,
+    baseURL: process.env.BETTER_AUTH_URL,
+    secret: process.env.BETTER_AUTH_SECRET,
 });

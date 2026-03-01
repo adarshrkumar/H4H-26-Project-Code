@@ -1,4 +1,3 @@
-import 'dotenv/config';
 import { z } from 'zod';
 import { structured } from '@/lib/ai-service';
 import type { SectionPrompt } from './generate-and-save';

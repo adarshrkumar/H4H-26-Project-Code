@@ -15,8 +15,7 @@ import config from '@/lib/config';
 // ---------------------------------------------------------------------------
 
 function getApiKey(name: string): string | undefined {
-    // Astro server-side env first, then Node process.env
-    return (import.meta.env as Record<string, string | undefined>)[name] ?? process.env[name];
+    return process.env[name];
 }
 
 /**
