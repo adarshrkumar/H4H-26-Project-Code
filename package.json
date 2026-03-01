@@ -15,17 +15,22 @@
         "test:safari": "npx playwright test --headed --browser=webkit",
         "test": "npm run test:chrome && npm run test:firefox && npm run test:safari",
         "spatial:dev": "webspatial-builder dev",
-        "spatial:build": "webspatial-builder build"
+        "spatial:build": "webspatial-builder build",
+        "stylelint:fix": "npx stylelint \"src/**/*.scss\" --fix"
     },
     "dependencies": {
         "@ai-sdk/anthropic": "^2.0.67",
         "@ai-sdk/gateway": "^1.0.0",
+        "@astrojs/check": "^0.9.6",
+        "@astrojs/vercel": "^9.0.2",
         "@elevenlabs/elevenlabs-js": "^2.37.0",
         "@huggingface/transformers": "^3.8.1",
         "@neondatabase/serverless": "^0.10.4",
         "@webspatial/core-sdk": "^1.2.0",
         "@webspatial/react-sdk": "^1.2.0",
         "ai": "^5.0.0",
+        "astro": "^5.16.6",
+        "audiomotion-analyzer": "^4.5.4",
         "better-auth": "^1.5.0",
         "cheerio": "^1.0.0",
         "dotenv": "^17.3.1",
@@ -56,7 +61,9 @@
         "eslint": "^9.0.0",
         "eslint-config-next": "^15.1.0",
         "stylelint": "^17.4.0",
-        "stylelint-config-standard-scss": "^17.0.0"
+        "stylelint-config-standard-scss": "^17.0.0",
+        "vercel": "^39.2.0",
+        "vite-plugin-pwa": "^0.21.2"
     },
     "engines": {
         "node": ">=18.0.0"

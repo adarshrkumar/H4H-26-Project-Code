@@ -1,6 +1,6 @@
 /**
  * View-page (Audio to Color) client-side logic.
- * Extracted from src/scripts/ViewScript.astro.
+ * Analyzer ported from gen-music-ref/src/scripts/ViewScript.astro (Gen-Music branch).
  *
  * Call `initViewScript()` once the page DOM is ready (e.g. inside useEffect).
  * Returns a cleanup function that stops the audio pipeline.
@@ -11,12 +11,15 @@ import { METRICS } from '@/lib/metrics';
 export function initViewScript(): () => void {
     const state = {
         prevSpectrum:  null as Uint8Array<ArrayBuffer> | null,
-        onsetTimes:    []   as number[],
-        energyHistory: []   as number[],
+        prevEnergy:    0,
+        onsetTimes:    [] as number[],
+        energyHistory: [] as number[],
         energyEMA:     0,
         sampleRate:    44100,
     };
 
+    const MIN_THRESHOLD  = 0.01;
+    const NUM_HISTORY    = 100;
     const ENERGY_HISTORY = 10;
 
     function getAudioFeatures(dataArray: Uint8Array<ArrayBuffer>, timeDomainArray?: Uint8Array<ArrayBuffer>) {
@@ -33,11 +36,14 @@ export function initViewScript(): () => void {
             totalAmplitude += dataArray[i];
         }
 
+        // ── energy ───────────────────────────────────────────────────────────
         const energy = (sum / N) / 255;
 
+        // ── brightness ───────────────────────────────────────────────────────
         const logCentroid = totalAmplitude > 0 ? weightedLogSum / totalAmplitude : 0;
         const brightness  = logCentroid / Math.log2(N);
 
+        // ── spread ───────────────────────────────────────────────────────────
         let spreadSum = 0;
         for (let i = 1; i < N; i++) {
             const d = Math.log2(i) - logCentroid;
@@ -46,6 +52,7 @@ export function initViewScript(): () => void {
         const spread = Math.min(1, totalAmplitude > 0
             ? Math.sqrt(spreadSum / totalAmplitude) / Math.log2(N) : 0);
 
+        // ── flux ─────────────────────────────────────────────────────────────
         let flux = 0;
         if (state.prevSpectrum && totalAmplitude > 0) {
             let rawFlux = 0;
@@ -57,18 +64,12 @@ export function initViewScript(): () => void {
         }
         state.prevSpectrum = new Uint8Array(dataArray);
 
-        const now = performance.now();
-        state.energyEMA = state.energyEMA * 0.88 + energy * 0.12;
-        let isBeat = false;
-        if (
-            energy > state.energyEMA * 1.25 &&
-            energy > 0.03 &&
-            (state.onsetTimes.length === 0 || now - state.onsetTimes[state.onsetTimes.length - 1] > 200)
-        ) {
-            state.onsetTimes.push(now);
-            isBeat = true;
-        }
-        const cutoff = now - 6000;
+        // ── onset / tempo ────────────────────────────────────────────────────
+        const now   = performance.now();
+        const delta = energy - state.prevEnergy;
+        if (delta > 0.12 && energy > 0.15) state.onsetTimes.push(now);
+        state.prevEnergy = energy;
+        const cutoff = now - 3000;
         while (state.onsetTimes.length > 0 && state.onsetTimes[0] < cutoff)
             state.onsetTimes.shift();
         let tempo = 0;
@@ -80,21 +81,27 @@ export function initViewScript(): () => void {
             tempo = Math.min(1, Math.max(0, (60000 / avgInterval - 40) / 140));
         }
 
+        // ── flatness ─────────────────────────────────────────────────────────
         let flatness = 0;
         if (totalAmplitude > 0) {
-            const n = N - 1;
-            let logSum = 0;
-            for (let i = 1; i < N; i++) logSum += Math.log(dataArray[i] + 1);
-            const geoMean   = Math.exp(logSum / n);
-            const arithMean = (totalAmplitude + n) / n;
-            flatness = Math.min(1, geoMean / arithMean);
+            let logSum = 0, nonZero = 0;
+            for (let i = 1; i < N; i++) {
+                if (dataArray[i] > 0) { logSum += Math.log(dataArray[i]); nonZero++; }
+            }
+            if (nonZero > 0) {
+                const geoMean   = Math.exp(logSum / nonZero);
+                const arithMean = totalAmplitude / N;
+                flatness = Math.min(1, arithMean > 0 ? geoMean / arithMean : 0);
+            }
         }
 
+        // ── bassRatio (bottom 10% of bins) ───────────────────────────────────
         const bassEnd = Math.max(1, Math.floor(N * 0.10));
         let bassSum = 0;
         for (let i = 0; i < bassEnd; i++) bassSum += dataArray[i];
         const bassRatio = totalAmplitude > 0 ? Math.min(1, bassSum / totalAmplitude) : 0;
 
+        // ── ZCR ──────────────────────────────────────────────────────────────
         let zcr = 0;
         if (timeDomainArray && timeDomainArray.length > 1) {
             let crossings = 0;
@@ -106,6 +113,7 @@ export function initViewScript(): () => void {
             zcr = crossings / (timeDomainArray.length - 1);
         }
 
+        // ── rolloff (85% spectral energy threshold) ───────────────────────────
         let rolloff = 1;
         if (totalAmplitude > 0) {
             let cumulative = 0;
@@ -116,21 +124,26 @@ export function initViewScript(): () => void {
             }
         }
 
+        // ── subBass (20–80 Hz) ───────────────────────────────────────────────
         const subBassEnd = hz2bin(80);
         let subBassSum = 0;
         for (let i = 1; i <= subBassEnd; i++) subBassSum += dataArray[i];
-        const subBass = totalAmplitude > 0 ? Math.min(1, subBassSum / totalAmplitude) : 0;
+        const subBass = totalAmplitude > 0
+            ? Math.min(1, (subBassSum / subBassEnd) / (totalAmplitude / N)) : 0;
 
+        // ── midRatio (250 Hz – 4 kHz) ────────────────────────────────────────
         const midStart = hz2bin(250), midEnd = hz2bin(4000);
         let midSum = 0;
         for (let i = midStart; i <= midEnd; i++) midSum += dataArray[i];
         const midRatio = totalAmplitude > 0 ? Math.min(1, midSum / totalAmplitude) : 0;
 
+        // ── highRatio (8 kHz+) ────────────────────────────────────────────────
         const highStart = hz2bin(8000);
         let highSum = 0;
         for (let i = highStart; i < N; i++) highSum += dataArray[i];
         const highRatio = totalAmplitude > 0 ? Math.min(1, highSum / totalAmplitude) : 0;
 
+        // ── RMS ───────────────────────────────────────────────────────────────
         let rms = 0;
         if (timeDomainArray) {
             let sq = 0;
@@ -141,6 +154,7 @@ export function initViewScript(): () => void {
             rms = Math.sqrt(sq / timeDomainArray.length);
         }
 
+        // ── crestFactor (peak / RMS, normalised to ~0–1) ──────────────────────
         let crestFactor = 0;
         if (timeDomainArray && rms > 0.001) {
             let peak = 0;
@@ -151,6 +165,7 @@ export function initViewScript(): () => void {
             crestFactor = Math.min(1, (peak / rms) / 14);
         }
 
+        // ── dynamicRange ──────────────────────────────────────────────────────
         let dynamicRange = 0;
         if (timeDomainArray) {
             let maxA = 0, minA = 255;
@@ -161,6 +176,7 @@ export function initViewScript(): () => void {
             dynamicRange = (maxA - minA) / 255;
         }
 
+        // ── spectralContrast (peak–valley across 6 sub-bands) ─────────────────
         let spectralContrast = 0;
         {
             const numBands = 6;
@@ -179,6 +195,7 @@ export function initViewScript(): () => void {
             spectralContrast = Math.min(1, (contrastSum / numBands) / 255);
         }
 
+        // ── harmonicRatio (energy at integer multiples of strongest low bin) ───
         let harmonicRatio = 0;
         {
             const searchEnd = Math.floor(N * 0.25);
@@ -199,6 +216,7 @@ export function initViewScript(): () => void {
             }
         }
 
+        // ── chroma (12 pitch classes) ─────────────────────────────────────────
         const chroma = new Float32Array(12);
         for (let i = 1; i < N; i++) {
             const freq = i * sr / fftSz;
@@ -217,8 +235,9 @@ export function initViewScript(): () => void {
         }
         const chromaMean     = chromaTotal / 12;
         const chromaStrength = chromaMean > 0 ? Math.min(1, (chromaMax / chromaMean) / 4) : 0;
-        const dominantPitch  = chromaMaxIdx / 11;
+        const dominantPitch  = chromaMaxIdx / 11; // 0 = C … 1 = B
 
+        // ── pitch (dominant frequency in musical range, log-normalised) ───────
         let pitch = 0;
         {
             const pitchMinBin = hz2bin(50);
@@ -234,6 +253,7 @@ export function initViewScript(): () => void {
             }
         }
 
+        // ── attackTime (steepest energy rise over last 10 frames) ────────────
         state.energyHistory.push(energy);
         if (state.energyHistory.length > ENERGY_HISTORY) state.energyHistory.shift();
         let maxRise = 0;
@@ -243,6 +263,7 @@ export function initViewScript(): () => void {
         }
         const attackTime = Math.min(1, maxRise * 8);
 
+        // ── beatRegularity (1 − coefficient of variation of onset intervals) ──
         let beatRegularity = 0;
         if (state.onsetTimes.length >= 3) {
             const intervals: number[] = [];
@@ -254,6 +275,7 @@ export function initViewScript(): () => void {
             beatRegularity = Math.max(0, 1 - Math.min(1, cv));
         }
 
+        // ── roughness (adjacent strong-bin energy / beating) ─────────────────
         let roughness = 0;
         {
             let roughSum = 0;
@@ -264,6 +286,7 @@ export function initViewScript(): () => void {
             roughness = totalAmplitude > 0 ? Math.min(1, roughSum / totalAmplitude) : 0;
         }
 
+        // ── MFCC-1 (spectral tilt via mel filterbank + DCT) ───────────────────
         let mfcc1 = 0;
         {
             const numFilters = 13;
@@ -284,9 +307,10 @@ export function initViewScript(): () => void {
             let raw = 0;
             for (let i = 0; i < numFilters; i++)
                 raw += melFilters[i] * Math.cos(Math.PI * (i + 0.5) / numFilters);
-            mfcc1 = Math.min(1, Math.max(0, (raw + 50) / 100));
+            mfcc1 = Math.min(1, Math.max(0, (raw + 10) / 20));
         }
 
+        // ── tonnetz (fifth-related tonal coherence from chroma) ───────────────
         let tonnetz = 0;
         if (chromaTotal > 0) {
             let tCos = 0, tSin = 0;
@@ -306,27 +330,178 @@ export function initViewScript(): () => void {
             chromaStrength, dominantPitch,
             pitch, attackTime, beatRegularity,
             roughness, mfcc1, tonnetz,
-            isBeat,
         };
     }
 
-    // ── Metrics ───────────────────────────────────────────────────────────────
+    type Features = ReturnType<typeof getAudioFeatures>;
 
-    const HISTORY_LEN = 80;
-    type MetricKey = typeof METRICS[number]['key'];
-    const metricHistory = {} as Record<MetricKey, number[]>;
-    const metricCtx     = {} as Record<MetricKey, CanvasRenderingContext2D>;
-    const metricValEls  = {} as Record<MetricKey, HTMLElement>;
-    for (const { key } of METRICS) {
-        metricHistory[key] = [];
-        const canvas = document.getElementById(`graph-${key}`) as HTMLCanvasElement | null;
-        if (canvas) metricCtx[key] = canvas.getContext('2d')!;
-        const valEl = document.getElementById(`val-${key}`);
-        if (valEl) metricValEls[key] = valEl;
+    // ── Mood engine (from Gen-Music ViewScript.astro) ─────────────────────────
+
+    function getMood(f: Features): string {
+        if (f.energy < MIN_THRESHOLD) return 'silent';
+
+        // Base: energy × brightness
+        let mood: string;
+        if (f.energy < 0.35) {
+            mood = f.brightness < 0.38 ? 'melancholic' : f.brightness < 0.65 ? 'peaceful' : 'serene';
+        } else if (f.energy < 0.60) {
+            mood = f.brightness < 0.38 ? 'tense' : f.brightness < 0.65 ? 'focused' : 'uplifting';
+        } else {
+            mood = f.brightness < 0.38 ? 'angry' : f.brightness < 0.65 ? 'powerful' : 'excited';
+        }
+
+        // Volume extremes
+        if (f.energy > 0.80) {
+            const m: Record<string, string> = { peaceful: 'uplifting', serene: 'excited', focused: 'powerful', uplifting: 'excited', melancholic: 'tense', tranquil: 'peaceful', meditative: 'serene', hopeful: 'uplifting', somber: 'melancholic', contemplative: 'focused', brooding: 'tense', heavy: 'powerful', giddy: 'excited' };
+            mood = m[mood] ?? mood;
+        } else if (f.energy < 0.22) {
+            const m: Record<string, string> = { angry: 'tense', powerful: 'focused', excited: 'uplifting', furious: 'angry', intense: 'powerful', frantic: 'tense', driven: 'focused', restless: 'melancholic', joyful: 'peaceful', playful: 'peaceful', euphoric: 'serene' };
+            mood = m[mood] ?? mood;
+        }
+
+        // Tempo
+        if (f.tempo > 0.65) {
+            const m: Record<string, string> = { melancholic: 'restless', peaceful: 'playful', serene: 'joyful', tense: 'frantic', focused: 'driven', uplifting: 'euphoric', angry: 'furious', powerful: 'intense', excited: 'euphoric' };
+            mood = m[mood] ?? mood;
+        } else if (f.tempo > 0 && f.tempo < 0.25) {
+            const m: Record<string, string> = { melancholic: 'somber', peaceful: 'tranquil', serene: 'meditative', tense: 'brooding', focused: 'contemplative', uplifting: 'hopeful', angry: 'smoldering', powerful: 'heavy', excited: 'giddy' };
+            mood = m[mood] ?? mood;
+        }
+
+        // Flux / drone
+        if (f.flux < 0.05 && f.energy > 0.12) {
+            const m: Record<string, string> = { melancholic: 'somber', peaceful: 'meditative', serene: 'meditative', tense: 'brooding', focused: 'contemplative', uplifting: 'hopeful', angry: 'smoldering', powerful: 'heavy', excited: 'giddy', restless: 'brooding', frantic: 'tense', driven: 'focused', euphoric: 'serene', furious: 'angry', intense: 'powerful' };
+            mood = m[mood] ?? mood;
+        }
+
+        // Spectral spread
+        if (f.spread > 0.55 && f.energy > 0.40) {
+            const m: Record<string, string> = { focused: 'powerful', tense: 'frantic', uplifting: 'excited', peaceful: 'uplifting', melancholic: 'tense', contemplative: 'focused', tranquil: 'peaceful' };
+            mood = m[mood] ?? mood;
+        }
+
+        // Bass-heavy
+        if (f.bassRatio > 0.30 && f.energy > 0.25) {
+            const m: Record<string, string> = { uplifting: 'focused', excited: 'powerful', joyful: 'driven', playful: 'restless', hopeful: 'contemplative', giddy: 'restless', euphoric: 'intense', serene: 'peaceful', tranquil: 'somber' };
+            mood = m[mood] ?? mood;
+        }
+
+        // Noisy (flatness + zcr)
+        if (f.flatness > 0.70 && f.zcr > 0.15 && f.energy > 0.15) {
+            const m: Record<string, string> = { peaceful: 'restless', serene: 'uplifting', tranquil: 'peaceful', meditative: 'contemplative', somber: 'brooding', hopeful: 'focused', contemplative: 'tense' };
+            mood = m[mood] ?? mood;
+        }
+
+        // Percussive / transient
+        if (f.crestFactor > 0.65 && f.attackTime > 0.50) {
+            const m: Record<string, string> = { peaceful: 'playful', serene: 'joyful', melancholic: 'restless', focused: 'driven', tense: 'frantic', uplifting: 'euphoric', contemplative: 'focused', somber: 'brooding' };
+            mood = m[mood] ?? mood;
+        }
+
+        // Rough / dissonant
+        if (f.roughness > 0.60 && f.energy > 0.20) {
+            const m: Record<string, string> = { peaceful: 'tense', serene: 'tense', melancholic: 'brooding', focused: 'tense', uplifting: 'excited', tranquil: 'melancholic', hopeful: 'contemplative', meditative: 'somber', joyful: 'restless', playful: 'restless' };
+            mood = m[mood] ?? mood;
+        }
+
+        // Strong harmonic content → tonal/melodic
+        if (f.harmonicRatio > 0.35 && f.roughness < 0.30) {
+            const m: Record<string, string> = { tense: 'focused', angry: 'powerful', frantic: 'driven', restless: 'peaceful', brooding: 'melancholic', smoldering: 'tense', heavy: 'powerful' };
+            mood = m[mood] ?? mood;
+        }
+
+        // Groovy: regular beat + fast tempo
+        if (f.beatRegularity > 0.75 && f.tempo > 0.55) {
+            const m: Record<string, string> = { focused: 'driven', uplifting: 'euphoric', powerful: 'intense', excited: 'euphoric', peaceful: 'playful', joyful: 'euphoric', driven: 'euphoric' };
+            mood = m[mood] ?? mood;
+        }
+
+        // Sub-bass heavy → heavy/deep
+        if (f.subBass > 0.25 && f.energy > 0.30) {
+            const m: Record<string, string> = { uplifting: 'powerful', excited: 'intense', joyful: 'driven', peaceful: 'focused', hopeful: 'contemplative', playful: 'restless', euphoric: 'intense' };
+            mood = m[mood] ?? mood;
+        }
+
+        // High-frequency dominant → airy/bright
+        if (f.highRatio > 0.20 && f.energy > 0.15) {
+            const m: Record<string, string> = { melancholic: 'serene', somber: 'contemplative', brooding: 'focused', heavy: 'tense', smoldering: 'brooding', tranquil: 'serene', meditative: 'serene' };
+            mood = m[mood] ?? mood;
+        }
+
+        // Strong tonal coherence (tonnetz) → resolved/consonant
+        if (f.tonnetz > 0.60 && f.harmonicRatio > 0.20) {
+            const m: Record<string, string> = { tense: 'focused', angry: 'tense', frantic: 'restless', brooding: 'melancholic', heavy: 'powerful' };
+            mood = m[mood] ?? mood;
+        }
+
+        return mood;
     }
 
-    const FRAME_INTERVAL_MS = 1000 / 60;
-    let   lastFrameTime     = 0;
+    const MOOD_PALETTE: Record<string, { hue: number; chroma: number; baseL: number }> = {
+        silent:        { hue: 0,   chroma: 0,    baseL: 93 },
+        melancholic:   { hue: 248, chroma: 0.12, baseL: 28 },
+        peaceful:      { hue: 205, chroma: 0.11, baseL: 50 },
+        serene:        { hue: 175, chroma: 0.13, baseL: 58 },
+        tense:         { hue: 22,  chroma: 0.18, baseL: 36 },
+        focused:       { hue: 128, chroma: 0.10, baseL: 38 },
+        uplifting:     { hue: 72,  chroma: 0.18, baseL: 52 },
+        angry:         { hue: 348, chroma: 0.21, baseL: 40 },
+        powerful:      { hue: 25,  chroma: 0.22, baseL: 44 },
+        excited:       { hue: 48,  chroma: 0.25, baseL: 56 },
+        restless:      { hue: 35,  chroma: 0.20, baseL: 45 },
+        playful:       { hue: 80,  chroma: 0.22, baseL: 58 },
+        joyful:        { hue: 55,  chroma: 0.24, baseL: 62 },
+        frantic:       { hue: 10,  chroma: 0.24, baseL: 42 },
+        driven:        { hue: 150, chroma: 0.15, baseL: 42 },
+        euphoric:      { hue: 300, chroma: 0.24, baseL: 58 },
+        furious:       { hue: 0,   chroma: 0.28, baseL: 30 },
+        intense:       { hue: 20,  chroma: 0.26, baseL: 38 },
+        somber:        { hue: 230, chroma: 0.13, baseL: 20 },
+        tranquil:      { hue: 200, chroma: 0.08, baseL: 65 },
+        meditative:    { hue: 185, chroma: 0.09, baseL: 45 },
+        brooding:      { hue: 270, chroma: 0.11, baseL: 25 },
+        contemplative: { hue: 250, chroma: 0.09, baseL: 40 },
+        hopeful:       { hue: 45,  chroma: 0.15, baseL: 55 },
+        smoldering:    { hue: 10,  chroma: 0.16, baseL: 25 },
+        heavy:         { hue: 30,  chroma: 0.14, baseL: 28 },
+        giddy:         { hue: 320, chroma: 0.19, baseL: 60 },
+    };
+
+    function moodToColor(mood: string, energy: number): { color: string; l: number; c: number; h: number } {
+        const base = MOOD_PALETTE[mood] ?? MOOD_PALETTE['focused'];
+        const l    = Math.min(85, Math.max(10, base.baseL + (energy - 0.5) * 30));
+        return { color: `oklch(${Math.round(l)}% ${base.chroma} ${base.hue})`, l, c: base.chroma, h: base.hue };
+    }
+
+    // ── Build bar-based metrics panel ─────────────────────────────────────────
+
+    const metricsPanel = document.getElementById('metrics');
+    if (metricsPanel) {
+        for (const { key, label } of METRICS) {
+            metricsPanel.insertAdjacentHTML('beforeend', `
+                <div class="metric-row">
+                    <span class="metric-label">${label}</span>
+                    <div class="metric-track">
+                        <div class="metric-bar bar-${key}" id="bar-${key}" style="background-color: var(--bar-color-${key})"></div>
+                    </div>
+                    <span class="metric-value val-${key}" id="val-${key}">0.00</span>
+                </div>
+            `);
+        }
+    }
+
+    // ── Canvas and mood display ───────────────────────────────────────────────
+
+    const canvas      = document.getElementById('colorCanvas') as HTMLCanvasElement | null;
+    const canvasCtx   = canvas?.getContext('2d') ?? null;
+    const moodDisplay = document.getElementById('mood');
+
+    if (canvasCtx && canvas) {
+        canvasCtx.fillStyle = '#fff';
+        canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    const lchHistory: { l: number; c: number; h: number }[] = [];
 
     // ── Audio setup ───────────────────────────────────────────────────────────
 
@@ -359,75 +534,34 @@ export function initViewScript(): () => void {
     function setupAnalyser() {
         analyser = audioContext!.createAnalyser();
         analyser.fftSize = 2048;
-        analyser.smoothingTimeConstant = 0.78;
         dataArray       = new Uint8Array(analyser.frequencyBinCount);
         timeDomainArray = new Uint8Array(analyser.fftSize);
     }
 
+    function resetCanvas() {
+        if (canvasCtx && canvas) {
+            canvasCtx.fillStyle = '#fff';
+            canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+    }
+
     function resetMetricBars() {
         for (const { key } of METRICS) {
-            metricHistory[key] = [];
-            const ctx = metricCtx[key];
-            if (ctx) {
-                ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-            }
-            if (metricValEls[key]) metricValEls[key].textContent = '0.00';
+            const bar = document.getElementById(`bar-${key}`);
+            const val = document.getElementById(`val-${key}`);
+            if (bar) bar.style.width = '0%';
+            if (val) val.textContent = '0.00';
         }
     }
 
     function updateMetricBars(features: Record<string, number>) {
-        for (const { key, color } of METRICS) {
-            const v    = features[key] ?? 0;
-            const hist = metricHistory[key];
-            hist.push(v);
-            if (hist.length > HISTORY_LEN) hist.shift();
-
-            const ctx = metricCtx[key];
-            if (!ctx) continue;
-            const W   = ctx.canvas.width;
-            const H   = ctx.canvas.height;
-
-            ctx.fillStyle = '#12121f';
-            ctx.fillRect(0, 0, W, H);
-
-            if (hist.length >= 2) {
-                const pad   = 3;
-                const xStep = W / (HISTORY_LEN - 1);
-
-                ctx.beginPath();
-                for (let i = 0; i < hist.length; i++) {
-                    const x = i * xStep;
-                    const y = H - pad - hist[i] * (H - pad * 2);
-                    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-                }
-                ctx.lineTo((hist.length - 1) * xStep, H);
-                ctx.lineTo(0, H);
-                ctx.closePath();
-                ctx.globalAlpha = 0.15;
-                ctx.fillStyle = color;
-                ctx.fill();
-                ctx.globalAlpha = 1;
-
-                ctx.beginPath();
-                ctx.strokeStyle = color;
-                ctx.lineWidth   = 1.5;
-                ctx.lineJoin    = 'round';
-                for (let i = 0; i < hist.length; i++) {
-                    const x = i * xStep;
-                    const y = H - pad - hist[i] * (H - pad * 2);
-                    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-                }
-                ctx.stroke();
-
-                const dotX = (hist.length - 1) * xStep;
-                const dotY = H - pad - v * (H - pad * 2);
-                ctx.beginPath();
-                ctx.arc(dotX, dotY, 2.5, 0, Math.PI * 2);
-                ctx.fillStyle = color;
-                ctx.fill();
-            }
-
-            if (metricValEls[key]) metricValEls[key].textContent = v.toFixed(2);
+        for (const { key } of METRICS) {
+            const v   = features[key] ?? 0;
+            const pct = Math.min(100, Math.round(v * 100));
+            const bar = document.getElementById(`bar-${key}`);
+            const val = document.getElementById(`val-${key}`);
+            if (bar) bar.style.width = `${pct}%`;
+            if (val) val.textContent = v.toFixed(2);
         }
     }
 
@@ -454,7 +588,10 @@ export function initViewScript(): () => void {
         if (micStartBtn)     micStartBtn.disabled     = false;
         if (micStopBtn)      micStopBtn.disabled      = true;
 
+        if (moodDisplay) moodDisplay.textContent = '';
+        lchHistory.length = 0;
         state.energyHistory.length = 0;
+        resetCanvas();
         resetMetricBars();
     }
 
@@ -572,24 +709,39 @@ export function initViewScript(): () => void {
 
     // ── Draw loop ─────────────────────────────────────────────────────────────
 
-    function drawVisualization(timestamp = 0) {
+    function drawVisualization() {
         if (!analyser || (!bufferSource && !sourceNode)) {
             if (animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
+            resetCanvas();
+            if (moodDisplay) moodDisplay.textContent = '';
             resetMetricBars();
             return;
         }
 
         animationFrameId = requestAnimationFrame(drawVisualization);
 
-        if (timestamp - lastFrameTime < FRAME_INTERVAL_MS) return;
-        lastFrameTime = timestamp;
-
         analyser.getByteFrequencyData(dataArray!);
         analyser.getByteTimeDomainData(timeDomainArray!);
 
         const features = getAudioFeatures(dataArray!, timeDomainArray!);
-        const { isBeat: _isBeat, ...numericFeatures } = features;
-        updateMetricBars(numericFeatures);
+        const mood     = getMood(features);
+        const { l, c, h } = moodToColor(mood, features.energy);
+
+        lchHistory.push({ l, c, h });
+        if (lchHistory.length > NUM_HISTORY) lchHistory.shift();
+
+        if (canvasCtx && canvas) {
+            const n    = lchHistory.length;
+            const avgL = lchHistory.reduce((s, v) => s + v.l, 0) / n;
+            const avgC = lchHistory.reduce((s, v) => s + v.c, 0) / n;
+            const avgH = lchHistory.reduce((s, v) => s + v.h, 0) / n;
+
+            canvasCtx.fillStyle = `oklch(${Math.round(avgL)}% ${avgC.toFixed(3)} ${Math.round(avgH)})`;
+            canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        if (moodDisplay) moodDisplay.textContent = mood;
+        updateMetricBars(features);
     }
 
     // ── Cleanup ───────────────────────────────────────────────────────────────

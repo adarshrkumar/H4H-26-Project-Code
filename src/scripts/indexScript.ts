@@ -124,6 +124,8 @@ export function initIndexScript(): () => void {
             selectedMood = btn.dataset.mood ?? '';
             selectedMoodColor = color;
             setMoodColor(color);
+            // Share mood color with the visualizer page
+            localStorage.setItem('viz-mood-color', color);
         });
     });
 
