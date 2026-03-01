@@ -1,116 +1,511 @@
 <script>
-    // --- Elements ---
-    const form = document.getElementById('generate-form') as HTMLFormElement;
-    const promptInput = document.getElementById('prompt') as HTMLTextAreaElement;
-    const generateBtn = document.getElementById('generate-btn') as HTMLButtonElement;
-    const errorBanner = document.getElementById('error-banner') as HTMLDivElement;
-    const errorMessage = document.getElementById('error-message') as HTMLParagraphElement;
-    const suggestionBox = document.getElementById('suggestion-box') as HTMLDivElement;
-    const suggestionText = document.getElementById('suggestion-text') as HTMLParagraphElement;
-    const useSuggestionBtn = document.getElementById('use-suggestion-btn') as HTMLButtonElement;
-    const loading = document.getElementById('loading') as HTMLDivElement;
-    const loadingMessage = document.getElementById('loading-message') as HTMLParagraphElement;
-    const sectionsContainer = document.getElementById('sections-container') as HTMLDivElement;
-    const sectionsGrid = document.getElementById('sections-grid') as HTMLDivElement;
+    // ── Constants ──────────────────────────────────────────────────────────────
 
-    // --- Types matching the API route response ---
-    interface GenerateResponse {
-        id: string;
+    const SECTION_IDS = ['intro', 'verse1', 'chorus', 'verse2', 'bridge', 'outro'] as const;
+    type SectionId = typeof SECTION_IDS[number];
+
+    const SECTION_LABELS: Record<SectionId, string> = {
+        intro: 'Intro', verse1: 'Verse 1', chorus: 'Chorus',
+        verse2: 'Verse 2', bridge: 'Bridge', outro: 'Outro',
+    };
+
+    const SECTION_ICONS: Record<SectionId, string> = {
+        intro: '🎬', verse1: '📖', chorus: '🎆',
+        verse2: '📗', bridge: '🌉', outro: '🌅',
+    };
+
+    // Duration per section (ms). Total ≈ 2:32, within the 2:30–4:00 target.
+    const SECTION_DURATIONS: Record<SectionId, number> = {
+        intro:  22000,
+        verse1: 30000,
+        chorus: 28000,
+        verse2: 30000,
+        bridge: 20000,
+        outro:  22000,
+    };
+
+    // Explicit structural role injected into every prompt so ElevenLabs knows
+    // exactly what kind of section it is composing.
+    const SECTION_MUSICAL_ROLE: Record<SectionId, string> = {
+        intro:  'INTRO/OPENING: establish the mood and musical theme gradually, build anticipation, do NOT reach full chorus energy yet — hint at what is coming',
+        verse1: 'VERSE 1: melodic foundation, moderate and steady energy, storytelling feel, build tension toward the chorus',
+        chorus: 'CHORUS/REFRAIN: the emotional and musical PEAK of the song, full energy release, strong memorable hook, this must be the most impactful part',
+        verse2: 'VERSE 2: similar structure to verse 1 but slightly more developed and intense, building back toward the chorus',
+        bridge: 'BRIDGE: contrasting section, different feel from verses and chorus, create musical tension and surprise before the final chorus',
+        outro:  'OUTRO/ENDING: bring the song to a natural close, resolve musical tension, wind down or fade — do NOT introduce new high-energy peaks',
+    };
+
+    // Pre-written lyrics per energy pattern × section.
+    // Auto-populated when user picks an energy card; fully editable.
+    const LYRICS_BY_ENERGY: Record<string, Record<SectionId, string>> = {
+        rise: {
+            intro:  'Something stirs in the silence\nA feeling starts to rise\nThe story opens slowly\nOpening tired eyes',
+            verse1: "I've been standing at this edge\nFeeling it begin to grow\nSlowly finding footing\nLearning as I go",
+            chorus: 'Rising through the noise\nRising through the fall\nThis is the moment building\nWaiting for the call',
+            verse2: 'Deeper still it rises\nGathering its strength\nPushing through the layers\nGoing to great lengths',
+            bridge: 'Before the final breaking\nEverything holds still\nThe tension keeps on climbing\nPushing past the thrill',
+            outro:  'Slowly coming down now\nThe feeling starts to ease\nEverything we built up\nReleased into the breeze',
+        },
+        explode: {
+            intro:  "Can't contain what's coming\nSomething's about to break\nEvery wall around me\nShaking in its wake",
+            verse1: 'Running through the fire\nNothing holds me back\nAll the words come pouring\nOff the beaten track',
+            chorus: 'Break it all wide open\nLet the chaos fly\nThis is the explosion\nWatch the sparks defy',
+            verse2: "Nothing can contain it\nSecond wave hits hard\nPushing through the limits\nEvery single shard",
+            bridge: 'Silence before the shockwave\nEverything goes still\nThen the world erupts again\nWith impossible will',
+            outro:  'After all the thunder\nAfter all the fire\nWhat remains is silence\nAnd something even higher',
+        },
+        minimal: {
+            intro:  'Just a note, just a breath\nJust the bare bones of a feeling\nStripped of all the extra\nJust the truth revealing',
+            verse1: 'Less is more than enough\nIn the space between the words\nSomething speaks more clearly\nThan anything you heard',
+            chorus: 'Simple and exact\nEvery word counts\nNothing more is needed\nThan what love amounts',
+            verse2: 'Back to what is real\nBack to quiet truth\nStripped back to the layers\nLike the days of youth',
+            bridge: 'In the stillness now\nEverything is clear\nNothing left to hide behind\nEverything right here',
+            outro:  'One last quiet note\nOne last moment held\nEverything was simple\nEverything was felt',
+        },
+        steady: {
+            intro:  'Beat by beat it enters\nPulse by pulse it grows\nSteady as the heartbeat\nEveryone already knows',
+            verse1: 'One foot then the other\nOne step at a time\nThe rhythm holds me steady\nFalling into rhyme',
+            chorus: 'Steady in the storm\nSteady through the night\nPulse the center constant\nKeeping rhythm right',
+            verse2: 'Still the beat continues\nConsistent all the way\nSomething you can count on\nEvery single day',
+            bridge: 'Even in the tension\nThe pulse does not break\nSteady through the shifting\nFor everyone\'s sake',
+            outro:  'The beat slows gently\nBut never fully stops\nThe rhythm lives inside you\nLong after it drops',
+        },
+        chaos: {
+            intro:  'Everything is spinning\nNothing stays in place\nWelcome to the madness\nRunning this dark race',
+            verse1: 'Words come out in fragments\nThoughts break into pieces\nIn the beautiful disorder\nEverything releases',
+            chorus: 'Chaos is the answer\nWild is the way\nEverything unpredictable\nNone of it okay',
+            verse2: 'Deeper in the spiral\nFaster through the blur\nEverything is happening\nNothing as it were',
+            bridge: 'In the eye of chaos\nFor one second still\nThen the storm comes back\nWith a violent thrill',
+            outro:  'After all the chaos\nComes a kind of peace\nAll the broken pieces\nCome to a release',
+        },
+        smooth: {
+            intro:  'Like water finding its way\nLike a river to the sea\nEverything flows gently\nSmooth as it can be',
+            verse1: 'Moving without friction\nGliding through the air\nEvery word a current\nCarrying me there',
+            chorus: 'Smooth and unbroken\nFlowing to the end\nEverything connected\nEvery single bend',
+            verse2: 'Still the river carries\nStill the current flows\nDeeper now and smoother\nOnly the river knows',
+            bridge: 'A pause in the flowing\nA moment without motion\nThen the wave continues\nAcross the endless ocean',
+            outro:  'The stream slows to a whisper\nThe river meets the sea\nEverything flows back now\nBack to what is meant to be',
+        },
+    };
+
+    function getLyricsSuggestion(sectionId: SectionId, energyPattern: string): string {
+        return LYRICS_BY_ENERGY[energyPattern]?.[sectionId]
+            ?? LYRICS_BY_ENERGY['smooth']?.[sectionId]
+            ?? '';
+    }
+
+    // ── State ──────────────────────────────────────────────────────────────────
+
+    let selectedMood = '';
+    let selectedMoodColor = '#e94560';
+
+    interface SectionResult {
+        sectionId: SectionId;
         title: string;
-        artist?: string;
-        duration?: number;
-        file?: { key: string; url?: string };
+        audioUrl: string;
+        energyPattern: string;
+        energyLabel: string;
+        energyValue: string;
+        customText: string;
+        lyrics: string;
+        moodColor: string;
     }
 
-    interface ErrorResponse {
-        error: string;
+    const generatedSections = new Map<SectionId, SectionResult>();
+
+    let playAllQueue: HTMLAudioElement[] = [];
+    let playAllIndex = 0;
+
+    // ── CSS variable helpers ───────────────────────────────────────────────────
+
+    function setMoodColor(color: string) {
+        document.documentElement.style.setProperty('--mood-color', color);
     }
 
-    // --- Helpers ---
-    function setLoading(on: boolean, message = 'Creating composition plan…') {
-        loading.hidden = !on;
-        loadingMessage.textContent = message;
-        generateBtn.disabled = on;
-        generateBtn.textContent = on ? 'Generating…' : 'Generate';
-    }
+    // ── Mood: hover shifts atmosphere, click locks it in ──────────────────────
 
-    function showError(message: string, suggestion?: string) {
-        errorBanner.hidden = false;
-        errorMessage.textContent = message;
-        if (suggestion) {
-            suggestionBox.hidden = false;
-            suggestionText.textContent = suggestion;
-        } else {
-            suggestionBox.hidden = true;
-        }
-    }
+    document.querySelectorAll<HTMLButtonElement>('.mood-btn').forEach(btn => {
+        const color = btn.dataset.color ?? '#e94560';
 
-    function clearError() {
-        errorBanner.hidden = true;
-        suggestionBox.hidden = true;
-    }
+        btn.addEventListener('mouseenter', () => setMoodColor(color));
+        btn.addEventListener('mouseleave', () => setMoodColor(selectedMoodColor));
 
-    function renderTrack(track: GenerateResponse, audioUrl: string) {
-        sectionsGrid.innerHTML = '';
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.mood-btn').forEach(b => {
+                b.classList.remove('selected');
+                b.setAttribute('aria-pressed', 'false');
+            });
+            btn.classList.add('selected');
+            btn.setAttribute('aria-pressed', 'true');
+            selectedMood = btn.dataset.mood ?? '';
+            selectedMoodColor = color;
+            setMoodColor(color);
 
-        const card = document.createElement('div');
-        card.className = 'section-card';
-        card.innerHTML = `
-            <div class="section-card__header">
-                <span class="section-card__name">${track.title}</span>
-                ${track.artist ? `<span class="section-card__duration">${track.artist}</span>` : ''}
-            </div>
-
-            <audio class="section-card__audio" controls src="${audioUrl}"></audio>
-            <a class="section-card__download btn secondary small"
-               href="${audioUrl}"
-               download="${track.title}">
-                Download
-            </a>
-        `;
-        sectionsGrid.appendChild(card);
-
-        sectionsContainer.hidden = false;
-    }
-
-    // --- Use suggestion button ---
-    useSuggestionBtn.addEventListener('click', () => {
-        promptInput.value = suggestionText.textContent ?? '';
-        clearError();
-        sectionsContainer.hidden = true;
+            // Propagate mood color to all energy-grid rhythm bars in sections
+            document.querySelectorAll<HTMLElement>('.energy-card .rhythm-viz span').forEach(span => {
+                // Color is driven via CSS var(--mood-color), no JS needed
+            });
+        });
     });
 
-    // --- Form submit ---
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        clearError();
-        sectionsContainer.hidden = true;
-        sectionsGrid.innerHTML = '';
+    // ── Energy cards: single-select per section ────────────────────────────────
 
-        const text = promptInput.value.trim();
+    document.querySelectorAll<HTMLButtonElement>('.energy-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const sectionId = card.dataset.section;
+            // Deselect all others in this section
+            document.querySelectorAll<HTMLButtonElement>(`.energy-card[data-section="${sectionId}"]`).forEach(c => {
+                c.classList.remove('selected');
+                c.setAttribute('aria-pressed', 'false');
+            });
+            // Toggle (click again to deselect)
+            const isNowSelected = !card.classList.contains('selected');
+            if (isNowSelected) {
+                card.classList.add('selected');
+                card.setAttribute('aria-pressed', 'true');
 
-        setLoading(true, 'Generating music…');
+                // Auto-fill lyrics if the textarea is still empty
+                const sectionId = card.dataset.section as SectionId;
+                const lyricsEl  = document.getElementById(`lyrics-${sectionId}`) as HTMLTextAreaElement | null;
+                if (lyricsEl && !lyricsEl.value.trim()) {
+                    lyricsEl.value = getLyricsSuggestion(sectionId, card.dataset.pattern ?? 'smooth');
+                }
+            }
+        });
+    });
+
+    // "Refresh lyrics" button — always re-generates based on current energy selection
+    SECTION_IDS.forEach(id => {
+        document.getElementById(`lyrics-suggest-${id}`)?.addEventListener('click', () => {
+            const lyricsEl = document.getElementById(`lyrics-${id}`) as HTMLTextAreaElement | null;
+            if (!lyricsEl) return;
+            const selected = document.querySelector<HTMLButtonElement>(`.energy-card[data-section="${id}"].selected`);
+            lyricsEl.value = getLyricsSuggestion(id, selected?.dataset.pattern ?? 'smooth');
+        });
+    });
+
+    // ── Song-context prompt builder ────────────────────────────────────────────
+    //
+    // Every section gets the full song identity so ElevenLabs generates them
+    // with a consistent key, tempo, and instrumentation.
+
+    function buildSectionPrompt(
+        sectionId: SectionId,
+        energyValue: string,
+        customText: string,
+        lyrics: string,
+    ): string {
+        const idx   = SECTION_IDS.indexOf(sectionId);
+        const label = SECTION_LABELS[sectionId];
+
+        const concept = (document.getElementById('song-concept') as HTMLInputElement | null)?.value.trim();
+        const style   = (document.getElementById('song-style')   as HTMLInputElement | null)?.value.trim();
+
+        const parts: string[] = [];
+
+        // 1. Song-wide identity shared by every section — locks in key, tempo, genre
+        const identity: string[] = [];
+        if (selectedMood) identity.push(selectedMood);
+        if (style)        identity.push(style);
+        if (concept)      identity.push(`song theme: ${concept}`);
+        identity.push('consistent musical key, BPM, timbre, and instrumentation across the entire song');
+        parts.push(identity.join(', '));
+
+        // 2. Full song structure so the model understands the overall arc
+        const structure = SECTION_IDS.map(id => SECTION_LABELS[id]).join(' → ');
+        parts.push(`full song structure: ${structure}`);
+
+        // 3. All previously generated sections as musical reference
+        const prevDescriptions: string[] = [];
+        for (const id of SECTION_IDS) {
+            if (id === sectionId) break;
+            const prev = generatedSections.get(id);
+            if (prev) {
+                let desc = `${SECTION_LABELS[id]}: ${prev.energyLabel}`;
+                if (prev.lyrics) desc += ` — lyrics: "${prev.lyrics.split('\n')[0]}…"`;
+                prevDescriptions.push(desc);
+            }
+        }
+        if (prevDescriptions.length > 0) {
+            parts.push(`sections already created: ${prevDescriptions.join('; ')}`);
+        }
+
+        // 4. Structural role — tells ElevenLabs what type of section this is
+        parts.push(SECTION_MUSICAL_ROLE[sectionId]);
+
+        // 5. Energy + custom description for this section
+        const current: string[] = [];
+        if (energyValue) current.push(energyValue);
+        if (customText)  current.push(customText);
+        if (current.length) parts.push(current.join(', '));
+
+        // 6. Lyrics embedded directly so the music matches the vocal content
+        if (lyrics) parts.push(`lyrics: "${lyrics}"`);
+
+        // 7. Transition instructions to neighbouring sections
+        const prevId = idx > 0 ? SECTION_IDS[idx - 1] : null;
+        const nextId = idx < SECTION_IDS.length - 1 ? SECTION_IDS[idx + 1] : null;
+        const flow: string[] = [];
+        if (prevId) flow.push(`flows naturally from the ${SECTION_LABELS[prevId]}`);
+        if (nextId) flow.push(`transitions smoothly into the ${SECTION_LABELS[nextId]}`);
+        if (flow.length) parts.push(flow.join(' and '));
+
+        return parts.join('. ');
+    }
+
+    // ── Per-section generation ─────────────────────────────────────────────────
+
+    SECTION_IDS.forEach(id => {
+        document.getElementById(`btn-${id}`)?.addEventListener('click', () => generateSection(id));
+    });
+
+    async function generateSection(sectionId: SectionId) {
+        const label    = SECTION_LABELS[sectionId];
+        const textarea = document.getElementById(`text-${sectionId}`) as HTMLTextAreaElement | null;
+        const btn      = document.getElementById(`btn-${sectionId}`) as HTMLButtonElement | null;
+        const statusEl = document.getElementById(`status-${sectionId}`) as HTMLElement | null;
+        const resultEl = document.getElementById(`result-${sectionId}`) as HTMLElement | null;
+        const block    = document.getElementById(`block-${sectionId}`);
+
+        if (!btn || !statusEl || !resultEl) return;
+
+        const selectedEnergy = document.querySelector<HTMLButtonElement>(
+            `.energy-card[data-section="${sectionId}"].selected`
+        );
+        const energyValue   = selectedEnergy?.dataset.value ?? '';
+        const energyPattern = selectedEnergy?.dataset.pattern ?? 'smooth';
+        const energyLabel   = selectedEnergy?.querySelector('.energy-card__label')?.textContent?.trim() ?? '';
+        const customText    = textarea?.value.trim() ?? '';
+        const lyricsEl      = document.getElementById(`lyrics-${sectionId}`) as HTMLTextAreaElement | null;
+        const lyrics        = lyricsEl?.value.trim() ?? '';
+
+        if (!selectedMood && !energyValue && !customText) {
+            setStatus(statusEl, 'error', '! Choose a mood or energy style first');
+            return;
+        }
+
+        // Build a context-rich prompt: song DNA + structural role + lyrics + transitions
+        const prompt = buildSectionPrompt(sectionId, energyValue, customText, lyrics);
+
+        // Set loading
+        btn.disabled = true;
+        btn.textContent = `Shaping ${label}…`;
+        setStatus(statusEl, 'loading', '⟳ Generating…');
+        resultEl.hidden = true;
+        block?.classList.remove('just-done');
 
         try {
             const res = await fetch('/api/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text }),
+                body: JSON.stringify({
+                    text: prompt,
+                    title: label,
+                    musicLengthMs: SECTION_DURATIONS[sectionId],
+                }),
             });
 
             if (!res.ok) {
-                const err: ErrorResponse = await res.json();
-                showError(err.error ?? 'Something went wrong. Please try again.');
+                const err = await res.json().catch(() => ({})) as Record<string, unknown>;
+                const message = typeof err.error === 'string' ? err.error : 'Generation failed.';
+                const suggestion = typeof err.suggestion === 'string' ? err.suggestion : undefined;
+                renderError(resultEl, message, suggestion, sectionId);
+                setStatus(statusEl, 'error', '✗ Error — see below');
+                btn.textContent = `Try ${label} Again`;
                 return;
             }
 
-            const data: GenerateResponse = await res.json();
+            const data = await res.json() as {
+                id: string;
+                title: string;
+                file?: { key: string; url?: string };
+            };
+
             const audioUrl = data.file?.url ?? '';
-            renderTrack(data, audioUrl);
-        } catch {
-            showError('Network error — could not reach the server.');
+            if (!audioUrl) throw new Error('No audio URL returned from the server.');
+
+            // Success
+            setStatus(statusEl, 'done', '✓ Shaped');
+            renderAudio(resultEl, audioUrl, data.title ?? label);
+            updateMapSegment(sectionId);
+
+            generatedSections.set(sectionId, {
+                sectionId,
+                title: data.title ?? label,
+                audioUrl,
+                energyPattern,
+                energyLabel,
+                energyValue,
+                customText,
+                lyrics,
+                moodColor: selectedMoodColor,
+            });
+            updateCombineList();
+
+            // Pulse glow animation on the card
+            block?.classList.add('just-done');
+            setTimeout(() => block?.classList.remove('just-done'), 1400);
+
+            btn.textContent = `Reshape ${label}`;
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Something went wrong.';
+            renderError(resultEl, message, undefined, sectionId);
+            setStatus(statusEl, 'error', '✗ Error');
+            btn.textContent = `Try ${label} Again`;
         } finally {
-            setLoading(false);
+            btn.disabled = false;
         }
+    }
+
+    // ── Render helpers ─────────────────────────────────────────────────────────
+
+    function setStatus(el: HTMLElement, state: 'idle' | 'loading' | 'done' | 'error', text: string) {
+        el.dataset.state = state;
+        el.textContent = text;
+    }
+
+    function renderAudio(container: HTMLElement, audioUrl: string, title: string) {
+        container.innerHTML = `
+            <div class="section-result">
+                <p class="section-result__label">Feel the pulse pattern — play your section:</p>
+                <audio class="section-result__audio" controls src="${audioUrl}" preload="metadata"></audio>
+                <a class="btn secondary small section-result__download"
+                   href="${audioUrl}" download="${title}.mp3">
+                    ⬇ Download
+                </a>
+            </div>
+        `;
+        container.hidden = false;
+    }
+
+    function renderError(container: HTMLElement, message: string, suggestion: string | undefined, sectionId: SectionId) {
+        const suggHtml = suggestion
+            ? `<div class="section-result__suggestion">
+                   <span class="section-result__suggestion-label">💡 Try this instead:</span>
+                   <span class="section-result__suggestion-text" id="sugg-${sectionId}">${suggestion}</span>
+                   <button class="btn secondary small" id="use-sugg-${sectionId}" type="button">Use suggestion</button>
+               </div>`
+            : '';
+        container.innerHTML = `
+            <div class="section-result error">
+                <p class="section-result__error-msg">⚠️ ${message}</p>
+                ${suggHtml}
+            </div>
+        `;
+        container.hidden = false;
+
+        if (suggestion) {
+            document.getElementById(`use-sugg-${sectionId}`)?.addEventListener('click', () => {
+                const textarea = document.getElementById(`text-${sectionId}`) as HTMLTextAreaElement | null;
+                if (textarea) textarea.value = suggestion;
+                container.hidden = true;
+                const statusEl = document.getElementById(`status-${sectionId}`);
+                if (statusEl) setStatus(statusEl, 'idle', '○ Not yet shaped');
+            });
+        }
+    }
+
+    function makeWaveformBars(count: number): string {
+        return Array.from({length: count}, (_, i) => `<span style="--i:${i}"></span>`).join('');
+    }
+
+    // ── Song map ───────────────────────────────────────────────────────────────
+
+    function updateMapSegment(sectionId: SectionId) {
+        const seg = document.getElementById(`map-${sectionId}`);
+        if (seg) seg.dataset.state = 'done';
+    }
+
+    // ── Combine list ───────────────────────────────────────────────────────────
+
+    function updateCombineList() {
+        const list     = document.getElementById('combine-list');
+        const empty    = document.getElementById('combine-empty');
+        const controls = document.getElementById('combine-controls');
+        if (!list || !empty || !controls) return;
+
+        list.innerHTML = '';
+        let count = 0;
+
+        for (const id of SECTION_IDS) {
+            const section = generatedSections.get(id);
+            if (!section) continue;
+            count++;
+
+            const card = document.createElement('div');
+            card.className = 'chapter-card';
+            card.id = `chapter-${id}`;
+            card.dataset.section = id;
+            card.style.setProperty('--section-color', section.moodColor);
+
+            card.innerHTML = `
+                <div class="chapter-card__header">
+                    <span class="chapter-card__icon">${SECTION_ICONS[id]}</span>
+                    <div class="chapter-card__info">
+                        <span class="chapter-card__name">${SECTION_LABELS[id]}</span>
+                        ${section.energyLabel
+                            ? `<span class="chapter-card__energy">${section.energyLabel}</span>`
+                            : ''}
+                    ${section.lyrics
+                            ? `<pre class="chapter-card__lyrics">${section.lyrics}</pre>`
+                            : ''}
+                    </div>
+                    <span class="chapter-card__now-playing" aria-live="polite">▶ Now playing</span>
+                </div>
+                <div class="chapter-waveform">
+                    <div class="rhythm-viz" data-pattern="${section.energyPattern}">
+                        ${makeWaveformBars(16)}
+                    </div>
+                </div>
+                <div class="chapter-card__controls">
+                    <audio class="chapter-card__audio" controls src="${section.audioUrl}" preload="metadata"></audio>
+                </div>
+            `;
+
+            list.appendChild(card);
+        }
+
+        empty.hidden = count > 0;
+        controls.hidden = count === 0;
+    }
+
+    // ── Play All ───────────────────────────────────────────────────────────────
+
+    document.getElementById('play-all-btn')?.addEventListener('click', () => {
+        const audios = document.querySelectorAll<HTMLAudioElement>('.chapter-card__audio');
+        playAllQueue = [...audios];
+        playAllIndex = 0;
+
+        playAllQueue.forEach(a => { a.pause(); a.currentTime = 0; });
+        document.querySelectorAll('.chapter-card').forEach(c => c.removeAttribute('data-playing'));
+
+        playNextInQueue();
     });
+
+    function playNextInQueue() {
+        if (playAllIndex >= playAllQueue.length) {
+            document.querySelectorAll('.chapter-card').forEach(c => c.removeAttribute('data-playing'));
+            return;
+        }
+
+        document.querySelectorAll('.chapter-card').forEach(c => c.removeAttribute('data-playing'));
+
+        const audio = playAllQueue[playAllIndex];
+        const card  = audio.closest<HTMLElement>('.chapter-card');
+
+        if (card) {
+            card.setAttribute('data-playing', 'true');
+            card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+            // Shift the whole page mood color to this chapter's mood
+            const sectionColor = card.style.getPropertyValue('--section-color');
+            if (sectionColor) setMoodColor(sectionColor);
+        }
+
+        audio.play().catch(() => {});
+        audio.addEventListener('ended', () => {
+            playAllIndex++;
+            playNextInQueue();
+        }, { once: true });
+    }
 </script>
