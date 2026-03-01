@@ -639,6 +639,7 @@
         analyser = audioContext!.createAnalyser();
         analyser.fftSize = 2048;
         analyser.smoothingTimeConstant = 0.78;
+        
         dataArray       = new Uint8Array(analyser.frequencyBinCount);
         timeDomainArray = new Uint8Array(analyser.fftSize);
     }
