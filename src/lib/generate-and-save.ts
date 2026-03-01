@@ -62,6 +62,7 @@ function getMusic(): Music {
         const apiKey =
             (import.meta as unknown as { env: Record<string, string> }).env?.ELEVENLABS_API_KEY ??
             process.env.ELEVENLABS_API_KEY;
+        console.log('[generate-and-save] ElevenLabs API key present:', !!apiKey);
         _music = new Music({ apiKey });
     }
     return _music;
@@ -78,6 +79,8 @@ function isElevenLabsError(err: unknown): err is { statusCode: number; body: Rec
 }
 
 export async function generateAndSave(input: GenerateAndSavePayload): Promise<GenerateAndSaveResult> {
+    console.log('[generate-and-save] start', { hasText: !!input.text, hasPlan: !!input.plan, title: input.title });
+
     if (!input.plan && !input.text?.trim()) {
         throw new GenerateAndSaveError('Either text or plan is required', 400);
     }
@@ -85,11 +88,19 @@ export async function generateAndSave(input: GenerateAndSavePayload): Promise<Ge
     // Step 1: composition plan (skipped when plan is provided directly)
     if (!input.plan) {
         const text = input.text!.trim();
+        console.log('[generate-and-save] step 1: generating composition plan from text');
         try {
             await generateCompositionPlan(text, input.musicLengthMs);
-        } catch {
+            console.log('[generate-and-save] step 1: composition plan done');
+        } catch (err) {
+            console.error('[generate-and-save] step 1: composition plan failed', err);
             throw new GenerateAndSaveError('Composition plan failed', 500);
         }
+    } else {
+        console.log('[generate-and-save] step 1: skipped (plan provided directly)', {
+            sections: input.plan.prompts.map(p => p.sectionName),
+            globalStyles: input.plan.positiveGlobalStyles,
+        });
     }
 
     // Step 2: generate music
@@ -114,17 +125,24 @@ export async function generateAndSave(input: GenerateAndSavePayload): Promise<Ge
             ...(input.musicLengthMs !== undefined && { musicLengthMs: input.musicLengthMs }),
         };
 
+    console.log('[generate-and-save] step 2: calling ElevenLabs composeDetailed', JSON.stringify(composeInput, null, 2));
+
     let audio: Buffer;
     let filename: string;
     let songTitle: string;
 
     try {
         const result = await getMusic().composeDetailed(composeInput);
+        console.log('[generate-and-save] step 2: composeDetailed result type:', typeof result);
+        console.log('[generate-and-save] step 2: result keys:', result ? Object.keys(result as object) : 'null/undefined');
         audio = result.audio;
         filename = result.filename;
         songTitle = input.title ?? result.json.songMetadata.title ?? (input.text ?? '').slice(0, 60);
+        console.log('[generate-and-save] step 2: audio bytes:', audio?.length, 'filename:', filename, 'title:', songTitle);
     } catch (err) {
+        console.error('[generate-and-save] step 2: composeDetailed failed', err);
         if (isElevenLabsError(err)) {
+            console.error('[generate-and-save] step 2: ElevenLabs error body', JSON.stringify(err.body));
             const code = err.body?.error as string | undefined;
             if (code === 'bad_prompt') {
                 throw new GenerateAndSaveError(
@@ -138,24 +156,29 @@ export async function generateAndSave(input: GenerateAndSavePayload): Promise<Ge
     }
 
     // Step 3: upload
+    console.log('[generate-and-save] step 3: uploading audio');
     let fileKey: string;
     let fileUrl: string | undefined;
 
     try {
         const file = new File([new Uint8Array(audio)], filename, { type: 'audio/mpeg' });
         const uploaded = await uploadFile(file);
+        console.log('[generate-and-save] step 3: upload result', JSON.stringify(uploaded));
         fileKey = uploaded.data?.key ?? '';
         fileUrl = fileKey ? getFileUrl(fileKey) : undefined;
-    } catch {
+        console.log('[generate-and-save] step 3: fileKey:', fileKey, 'fileUrl:', fileUrl);
+    } catch (err) {
+        console.error('[generate-and-save] step 3: upload failed', err);
         throw new GenerateAndSaveError('Failed to upload audio', 500);
     }
 
     // Step 4: persist to Convex
+    console.log('[generate-and-save] step 4: saving to Convex');
     try {
         await saveTrack({ id: fileKey, title: songTitle, artist: input.artist, mimeType: 'audio/mpeg', fileKey, fileUrl });
+        console.log('[generate-and-save] step 4: Convex save done');
     } catch (err) {
-        // Non-fatal: log but don't fail the request
-        console.error('[generate-and-save] Convex insert failed', err);
+        console.error('[generate-and-save] step 4: Convex insert failed', err);
     }
 
     return {
