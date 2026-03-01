@@ -211,9 +211,28 @@
         const prompt = buildCombinedPrompt();
 
         btn.disabled = true;
-        btn.textContent = '⟳ Composing your full song…';
         resultEl.innerHTML = '';
         resultEl.hidden = false;
+
+        // Step 1: create composition plan
+        btn.textContent = '⟳ Planning your composition…';
+        try {
+            const planRes = await fetch('/api/plan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt, musicLengthMs: 240000 }),
+            });
+            if (!planRes.ok) throw new Error('Composition plan failed.');
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Failed to create composition plan.';
+            resultEl.innerHTML = `<div class="section-result error"><p class="section-result__error-msg">⚠️ ${message}</p></div>`;
+            btn.textContent = '✨ Try Again';
+            btn.disabled = false;
+            return;
+        }
+
+        // Step 2: generate audio
+        btn.textContent = '⟳ Composing your full song…';
 
         try {
             const res = await fetch('/api/generate', {
