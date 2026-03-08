@@ -13,11 +13,21 @@ const blueprintSchema = z.object({
 
 export type SongBlueprint = z.infer<typeof blueprintSchema>;
 
+function ensureAiCredentials() {
+    const hasManagedGateway = Boolean(process.env.VERCEL_API_KEY?.trim());
+    const hasByok = Boolean(process.env.OPENAI_API_KEY?.trim());
+    if (!hasManagedGateway && !hasByok) {
+        throw new Error('Missing AI credentials. Set OPENAI_API_KEY or VERCEL_API_KEY in server environment.');
+    }
+}
+
 export async function generateSongBlueprint(input: {
     mood: string;
     songStyle: string;
     songConcept: string;
 }): Promise<SongBlueprint> {
+    ensureAiCredentials();
+
     const context = [
         input.mood       && `mood: ${input.mood}`,
         input.songStyle  && `style: ${input.songStyle}`,
@@ -62,6 +72,8 @@ const sectionPromptSchema = z.object({
 });
 
 export async function generateSectionPlan(input: GenerateSectionPlanInput): Promise<SectionPrompt> {
+    ensureAiCredentials();
+
     console.log('[generate-section-plan] start', {
         sectionId:  input.sectionId,
         sectionName: input.sectionName,

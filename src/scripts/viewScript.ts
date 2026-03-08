@@ -476,6 +476,10 @@ export function initViewScript(): () => void {
         colorblindMode:   false,
         reduceMotion:     false,
         smoothMode:       false,
+        neonGlow:         true,
+        waveTrails:       true,
+        hueDrift:         false,
+        partyMode:        false,
         running:          false,
         paused:           false,
     };
@@ -660,12 +664,21 @@ export function initViewScript(): () => void {
     function drawBeatFlash(W: number, H: number, hue: number) {
         if (beatFlashAlpha <= 0) return;
         const flash = ctx.createLinearGradient(0, 0, W, H);
-        const a     = beatFlashAlpha;
+        const a     = Math.min(1, beatFlashAlpha);
         flash.addColorStop(0,   `oklch(86% 0.36 ${hue + 25}  / ${a * 0.20})`);
         flash.addColorStop(0.5, `oklch(90% 0.44 ${hue + 120} / ${a * 0.32})`);
         flash.addColorStop(1,   `oklch(82% 0.30 ${hue + 210} / ${a * 0.18})`);
         ctx.fillStyle = flash;
         ctx.fillRect(0, 0, W, H);
+
+        if (vizState.partyMode) {
+            const stripe = ctx.createLinearGradient(0, H * 0.2, W, H * 0.8);
+            stripe.addColorStop(0,   `oklch(95% 0.46 ${hue + 320} / ${a * 0.16})`);
+            stripe.addColorStop(0.5, `oklch(98% 0.50 ${hue + 40}  / ${a * 0.24})`);
+            stripe.addColorStop(1,   `oklch(94% 0.44 ${hue + 120} / ${a * 0.16})`);
+            ctx.fillStyle = stripe;
+            ctx.fillRect(0, 0, W, H);
+        }
     }
 
     const CIRCLE_BANDS = ['ground', 'flow', 'form', 'spark', 'air'] as const;
@@ -781,18 +794,37 @@ export function initViewScript(): () => void {
                 else ctx.lineTo(x, y);
             }
 
-            ctx.save();
-            ctx.globalAlpha = 0.24 + level * 0.24;
-            ctx.strokeStyle = `oklch(${lum + 10}% 0.42 ${laneHue + 35})`;
-            ctx.lineWidth = lineWidth * 2.2;
-            ctx.stroke();
-            ctx.restore();
+            if (vizState.waveTrails && !vizState.reduceMotion) {
+                ctx.beginPath();
+                for (let i = 0; i <= segments; i++) {
+                    const frac = i / segments;
+                    const x = leftX + frac * width;
+                    const theta = frac * Math.PI * 2 * waveCycles + (phase - 0.95);
+                    const trailPrimary = Math.sin(theta) * amplitude * 0.96;
+                    const trailSecondary = Math.sin(theta * 0.5 + phase * 0.8 - 0.45) * amplitude * 0.22;
+                    const y = laneY + trailPrimary + trailSecondary;
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.strokeStyle = `oklch(${lum + 4}% 0.22 ${laneHue + 40} / ${0.22 + level * 0.20})`;
+                ctx.lineWidth = Math.max(1.1, lineWidth * 0.66);
+                ctx.stroke();
+            }
+
+            if (vizState.neonGlow) {
+                ctx.save();
+                ctx.globalAlpha = 0.24 + level * 0.24;
+                ctx.strokeStyle = `oklch(${lum + 10}% 0.42 ${laneHue + 35})`;
+                ctx.lineWidth = lineWidth * 2.2;
+                ctx.stroke();
+                ctx.restore();
+            }
 
             ctx.strokeStyle = grad;
             ctx.lineWidth = lineWidth;
             ctx.stroke();
 
-            if (!vizState.reduceMotion) {
+            if (!vizState.reduceMotion && vizState.neonGlow) {
                 const sweep = (tSec * (0.12 + laneIndex * 0.018) + laneIndex * 0.17) % 1;
                 const tipX = leftX + sweep * width;
                 const tipY = getY(sweep);
@@ -805,8 +837,28 @@ export function initViewScript(): () => void {
                 ctx.fill();
             }
 
-            ctx.fillStyle = `oklch(${lum - 16}% 0.14 ${laneHue + 10})`;
-            ctx.fillText(lane.label, bandLabelX, laneY);
+            const laneLabelLum = (vizState.highContrast ? 84 : 76) + level * 10;
+            const laneText = lane.label;
+            const laneMetrics = ctx.measureText(laneText);
+            const lanePadX = 7;
+            const lanePillH = 18;
+            const lanePillW = Math.max(54, laneMetrics.width + lanePadX * 2);
+            const lanePillX = bandLabelX - lanePillW - 4;
+            const lanePillY = laneY - lanePillH / 2;
+
+            ctx.beginPath();
+            ctx.roundRect(lanePillX, lanePillY, lanePillW, lanePillH, 8);
+            ctx.fillStyle = `oklch(15% 0.03 ${laneHue} / 0.72)`;
+            ctx.fill();
+            ctx.strokeStyle = `oklch(36% 0.12 ${laneHue + 20} / 0.55)`;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.shadowColor = `oklch(${laneLabelLum}% 0.28 ${laneHue + 30} / 0.55)`;
+            ctx.shadowBlur = 7;
+            ctx.fillStyle = `oklch(${laneLabelLum}% 0.18 ${laneHue + 12})`;
+            ctx.fillText(laneText, bandLabelX - 8, laneY);
+            ctx.shadowBlur = 0;
         }
 
         ctx.textAlign = 'left';
@@ -835,7 +887,7 @@ export function initViewScript(): () => void {
         const nowMs   = performance.now();
         const tSec    = nowMs * 0.001;
 
-        ctx.font         = '700 9px system-ui';
+        ctx.font         = '800 11px system-ui';
         ctx.textBaseline = 'middle';
 
         for (let i = 0; i < rows; i++) {
@@ -854,10 +906,28 @@ export function initViewScript(): () => void {
             }
 
             ctx.textAlign = 'right';
-            ctx.fillStyle = vizState.highContrast
-                ? `oklch(55% 0.10 ${bHue})`
-                : `oklch(35% 0.07 ${bHue})`;
-            ctx.fillText(label, leftX + labelW, midY);
+            const labelX = leftX + labelW;
+            const textMetrics = ctx.measureText(label);
+            const textPadX = 8;
+            const textPillH = 18;
+            const textPillW = Math.max(56, textMetrics.width + textPadX * 2);
+            const textPillX = labelX - textPillW - 3;
+            const textPillY = midY - textPillH / 2;
+
+            ctx.beginPath();
+            ctx.roundRect(textPillX, textPillY, textPillW, textPillH, 8);
+            ctx.fillStyle = `oklch(14% 0.03 ${bHue} / 0.78)`;
+            ctx.fill();
+            ctx.strokeStyle = `oklch(34% 0.11 ${bHue + 16} / 0.62)`;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            const labelLum = (vizState.highContrast ? 86 : 76) + energy * 12;
+            ctx.shadowColor = `oklch(${labelLum}% 0.24 ${bHue + 25} / 0.55)`;
+            ctx.shadowBlur = 6;
+            ctx.fillStyle = `oklch(${labelLum}% 0.16 ${bHue + 8})`;
+            ctx.fillText(label, labelX - 7, midY);
+            ctx.shadowBlur = 0;
 
             ctx.beginPath();
             ctx.roundRect(barX, y, maxBarW, barH, 8);
@@ -867,10 +937,12 @@ export function initViewScript(): () => void {
             if (energy > 0.005) {
                 const filled = maxBarW * Math.min(energy, 1);
 
-                ctx.beginPath();
-                ctx.roundRect(barX - 3, y - 5, filled + 6, barH + 10, 10);
-                ctx.fillStyle = `oklch(${lum}% 0.38 ${bHue} / 0.30)`;
-                ctx.fill();
+                if (vizState.neonGlow) {
+                    ctx.beginPath();
+                    ctx.roundRect(barX - 3, y - 5, filled + 6, barH + 10, 10);
+                    ctx.fillStyle = `oklch(${lum}% 0.38 ${bHue} / 0.30)`;
+                    ctx.fill();
+                }
 
                 const barGrad = ctx.createLinearGradient(barX, 0, barX + filled, 0);
                 barGrad.addColorStop(0,    `oklch(${lum}%      0.36 ${bHue})`);
@@ -881,7 +953,7 @@ export function initViewScript(): () => void {
                 ctx.fillStyle = barGrad;
                 ctx.fill();
 
-                if (!vizState.reduceMotion) {
+                if (!vizState.reduceMotion && vizState.neonGlow) {
                     const sweepFrac = Math.sin(tSec * 1.8 + i * 1.1) * 0.5 + 0.5;
                     const sweepX    = barX + sweepFrac * filled;
                     const shimW     = Math.max(20, Math.min(filled * 0.35, 80));
@@ -898,7 +970,7 @@ export function initViewScript(): () => void {
                     ctx.restore();
                 }
 
-                if (energy > 0.55) {
+                if (vizState.neonGlow && energy > 0.55) {
                     const tipAlpha = ((energy - 0.55) / 0.45) * 0.90;
                     const tipX = barX + filled;
                     const tg = ctx.createRadialGradient(tipX, midY, 0, tipX, midY, barH * 1.3);
@@ -974,9 +1046,11 @@ export function initViewScript(): () => void {
 
         const cx  = W / 2, cy = H / 2;
         const now = performance.now();
-        const hue = vizState.colorblindMode
+        const baseHue = vizState.colorblindMode
             ? (COLORBLIND_MAP[currentMoodId] ?? vizState.moodHue)
             : vizState.moodHue;
+        const driftShift = vizState.hueDrift ? (now * 0.02) % 360 : 0;
+        const hue = (baseHue + driftShift) % 360;
         const bands = getBands();
         updateCircleBandState(bands, now);
         const levels = updateSphereLabels(bands);
@@ -990,10 +1064,18 @@ export function initViewScript(): () => void {
 
         // Beat → accent flash + grid (use metricsAnalyser energy — same source as the metrics panel)
         if (detectBeat(metricsEnergy > 0 ? metricsEnergy : bands.overall, now)) {
-            if (!vizState.reduceMotion && vizState.sparkRingEnabled) beatFlashAlpha = 1;
+            if (!vizState.reduceMotion && vizState.sparkRingEnabled) {
+                beatFlashAlpha = vizState.partyMode ? 1.35 : 1;
+            }
             beatGrid[beatGridIdx] = true;
+            if (!vizState.reduceMotion && vizState.sparkRingEnabled && vizState.partyMode) {
+                spawnPulseRing(cx, cy, hue);
+            }
         }
-        if (beatFlashAlpha > 0) beatFlashAlpha = Math.max(0, beatFlashAlpha - 0.03);
+        if (beatFlashAlpha > 0) {
+            const beatDecay = vizState.partyMode ? 0.018 : 0.03;
+            beatFlashAlpha = Math.max(0, beatFlashAlpha - beatDecay);
+        }
 
         window.dispatchEvent(new CustomEvent('viz:band-levels', {
             detail: {
@@ -1017,6 +1099,7 @@ export function initViewScript(): () => void {
         }
         drawFrequencyBars(W, H, bands, hue);
         drawBandSineWaves(W, H, hue);
+        if (vizState.partyMode) drawPulseRings(cx, cy, hue);
 
         if (pulsePreview) {
             pulsePreview.style.transform = `scale(${1 + bands.overall * 0.5})`;
@@ -1289,6 +1372,10 @@ export function initViewScript(): () => void {
     applyMotionMQ(motionMQ.matches);
     motionMQ.addEventListener('change', e => applyMotionMQ(e.matches));
     bindToggle('smoothMode',      v => { vizState.smoothMode        = v; });
+    bindToggle('neonGlow',        v => { vizState.neonGlow          = v; });
+    bindToggle('waveTrails',      v => { vizState.waveTrails        = v; });
+    bindToggle('hueDrift',        v => { vizState.hueDrift          = v; });
+    bindToggle('partyMode',       v => { vizState.partyMode         = v; });
 
     // ── Help dropdown ─────────────────────────────────────────────────────────
 

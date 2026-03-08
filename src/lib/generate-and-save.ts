@@ -85,6 +85,12 @@ export async function generateAndSave(input: GenerateAndSavePayload): Promise<Ge
     if (!input.plan && !input.text?.trim()) {
         throw new GenerateAndSaveError('Either text or plan is required', 400);
     }
+    if (!process.env.ELEVENLABS_API_KEY?.trim()) {
+        throw new GenerateAndSaveError('Missing ELEVENLABS_API_KEY in server environment.', 500);
+    }
+    if (!process.env.UPLOADTHING_TOKEN?.trim()) {
+        throw new GenerateAndSaveError('Missing UPLOADTHING_TOKEN in server environment.', 500);
+    }
 
     // Step 1: composition plan (skipped when plan is provided directly)
     if (!input.plan) {
@@ -141,6 +147,7 @@ export async function generateAndSave(input: GenerateAndSavePayload): Promise<Ge
         songTitle = input.title ?? result.json.songMetadata.title ?? (input.text ?? '').slice(0, 60);
         console.log('[generate-and-save] step 2: audio bytes:', audio?.length, 'filename:', filename, 'title:', songTitle);
     } catch (err) {
+        if (err instanceof GenerateAndSaveError) throw err;
         console.error('[generate-and-save] step 2: composeDetailed failed', err);
         if (isElevenLabsError(err)) {
             console.error('[generate-and-save] step 2: ElevenLabs error body', JSON.stringify(err.body));
@@ -153,7 +160,8 @@ export async function generateAndSave(input: GenerateAndSavePayload): Promise<Ge
                 );
             }
         }
-        throw new GenerateAndSaveError('Failed to generate music', 500);
+        const reason = err instanceof Error ? err.message.trim() : '';
+        throw new GenerateAndSaveError(reason ? `Failed to generate music: ${reason}` : 'Failed to generate music', 500);
     }
 
     // Step 3: upload
@@ -173,7 +181,8 @@ export async function generateAndSave(input: GenerateAndSavePayload): Promise<Ge
         console.log('[generate-and-save] step 3: fileKey:', fileKey, 'fileUrl:', fileUrl);
     } catch (err) {
         console.error('[generate-and-save] step 3: upload failed', err);
-        throw new GenerateAndSaveError('Failed to upload audio', 500);
+        const reason = err instanceof Error ? err.message.trim() : '';
+        throw new GenerateAndSaveError(reason ? `Failed to upload audio: ${reason}` : 'Failed to upload audio', 500);
     }
 
     // Step 4: persist to Neon

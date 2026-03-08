@@ -857,6 +857,23 @@ body {
         font-size: 0.9rem;
     }
 
+    &__error-list {
+        margin: 2px 0 0;
+        padding-left: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        color: #fca5a5;
+        font-size: 0.82rem;
+    }
+
+    &__error-help {
+        margin: 0;
+        color: #b8c1e3;
+        font-size: 0.78rem;
+        line-height: 1.5;
+    }
+
     &__suggestion {
         display: flex;
         flex-direction: column;

@@ -180,17 +180,22 @@ export function initIndexScript(): () => void {
 
     type Blueprint = { key: string; bpm: number; coreInstruments: string[]; sonicCharacter: string };
 
-    async function generateBlueprint(globals: { songConcept: string; songStyle: string; mood: string }): Promise<Blueprint | null> {
+    async function generateBlueprint(globals: { songConcept: string; songStyle: string; mood: string }): Promise<{ blueprint: Blueprint | null; error: string | null }> {
         try {
             const res = await fetch('/api/generate-blueprint', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(globals),
             });
-            if (!res.ok) return null;
-            return await res.json() as Blueprint;
-        } catch {
-            return null;
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({})) as Record<string, unknown>;
+                const message = typeof body.error === 'string' ? body.error : 'Failed to build song blueprint.';
+                return { blueprint: null, error: message };
+            }
+            return { blueprint: await res.json() as Blueprint, error: null };
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Failed to build song blueprint.';
+            return { blueprint: null, error: message };
         }
     }
 
@@ -245,13 +250,35 @@ export function initIndexScript(): () => void {
         btn.disabled = true;
         resultEl.innerHTML = '';
         resultEl.hidden = false;
+
+        const hasConfiguredSections = SECTION_IDS.some(id => {
+            const selectedEnergy = document.querySelector<HTMLButtonElement>(`.energy-card[data-section="${id}"].selected`);
+            const lyrics = (document.getElementById(`lyrics-${id}`) as HTMLTextAreaElement | null)?.value.trim() ?? '';
+            const custom = (document.getElementById(`text-${id}`) as HTMLTextAreaElement | null)?.value.trim() ?? '';
+            return Boolean(selectedEnergy || lyrics || custom);
+        });
+        if (!hasConfiguredSections) {
+            resultEl.innerHTML = `
+                <div class="section-result error">
+                    <p class="section-result__error-msg">⚠ Configure at least one section in Step 2 before generating.</p>
+                    <p class="section-result__error-help">Pick an energy card or add lyrics/details in any section, then try again.</p>
+                </div>
+            `;
+            btn.disabled = false;
+            btn.textContent = '✨ Generate Full Song';
+            return;
+        }
+
         btn.textContent = '⟳ Building song blueprint…';
 
-        const blueprint = await generateBlueprint(globals);
+        const blueprintState = await generateBlueprint(globals);
+        const blueprint = blueprintState.blueprint;
 
         let doneCount  = 0;
         let errorCount = 0;
         const generatedIds: { sectionId: SectionId; trackId: string }[] = [];
+        const errorMessages: string[] = [];
+        if (blueprintState.error) errorMessages.push(`Blueprint: ${blueprintState.error}`);
 
         for (const id of SECTION_IDS) {
             const statusEl = document.getElementById(`status-${id}`);
@@ -284,6 +311,7 @@ export function initIndexScript(): () => void {
             } catch (err) {
                 errorCount++;
                 const message = err instanceof Error ? err.message : 'Error';
+                errorMessages.push(message);
                 if (statusEl) setStatus(statusEl, 'error', `⚠ ${message}`);
             }
         }
@@ -296,7 +324,20 @@ export function initIndexScript(): () => void {
             resultEl.innerHTML = `<div class="section-result"><p class="section-result__label">All ${doneCount} sections generated.</p>${viewBtn}</div>`;
             btn.textContent = '✨ Regenerate All Sections';
         } else if (doneCount === 0) {
-            resultEl.innerHTML = `<div class="section-result error"><p class="section-result__error-msg">⚠ All sections failed to generate.</p></div>`;
+            const failure = summarizeGenerationFailures(errorMessages);
+            const detailList = failure.details.length
+                ? `<ul class="section-result__error-list">${failure.details.map(d => `<li>${escapeHtml(d)}</li>`).join('')}</ul>`
+                : '';
+            const guidance = failure.guidance.length
+                ? `<p class="section-result__error-help">${failure.guidance.map(escapeHtml).join(' ')}</p>`
+                : '';
+            resultEl.innerHTML = `
+                <div class="section-result error">
+                    <p class="section-result__error-msg">⚠ All sections failed to generate.</p>
+                    ${detailList}
+                    ${guidance}
+                </div>
+            `;
             btn.textContent = '✨ Try Again';
         } else {
             resultEl.innerHTML = `<div class="section-result"><p class="section-result__label">${doneCount} section(s) ready, ${errorCount} failed.</p>${viewBtn}</div>`;
@@ -311,6 +352,50 @@ export function initIndexScript(): () => void {
     function setStatus(el: HTMLElement, state: 'idle' | 'loading' | 'done' | 'error', text: string) {
         el.dataset.state = state;
         el.textContent = text;
+    }
+
+    function escapeHtml(text: string): string {
+        return text
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#39;');
+    }
+
+    function summarizeGenerationFailures(rawMessages: string[]) {
+        const cleaned = rawMessages
+            .map(m => m.trim())
+            .filter(Boolean)
+            .map(m => (m.length > 180 ? `${m.slice(0, 177)}...` : m));
+        const details = Array.from(new Set(cleaned)).slice(0, 3);
+        const haystack = details.join(' ').toLowerCase();
+        const guidance: string[] = [];
+
+        if (haystack.includes('failed to fetch') || haystack.includes('networkerror')) {
+            guidance.push('API may be offline. Start the backend with `npm run dev:api` and retry.');
+        }
+        if (
+            haystack.includes('api key')
+            || haystack.includes('missing')
+            || haystack.includes('eleven')
+            || haystack.includes('openai')
+            || haystack.includes('uploadthing')
+            || haystack.includes('database')
+        ) {
+            guidance.push('Check required environment variables in `.env` before generating.');
+        }
+        if (
+            haystack.includes('failed to build song blueprint')
+            || haystack.includes('generation failed')
+            || haystack.includes('failed to generate section plan')
+        ) {
+            guidance.push('Required backend vars: DATABASE_URL, OPENAI_API_KEY (or VERCEL_API_KEY), ELEVENLABS_API_KEY, UPLOADTHING_TOKEN.');
+        }
+        if (guidance.length === 0) {
+            guidance.push('Check backend logs (`npm run dev:api`) for the exact error and retry.');
+        }
+        return { details, guidance };
     }
 
     function updateMapSegment(sectionId: SectionId) {

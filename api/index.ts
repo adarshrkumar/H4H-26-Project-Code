@@ -11,6 +11,13 @@ app.use(cors({ origin: process.env.VITE_APP_URL ?? 'http://localhost:5173' }));
 
 app.use(express.json());
 
+function clientErrorMessage(err: unknown, fallback: string): string {
+    if (!(err instanceof Error)) return fallback;
+    const firstLine = err.message.split('\n')[0]?.trim() ?? '';
+    if (!firstLine) return fallback;
+    return firstLine.length > 220 ? `${firstLine.slice(0, 217)}...` : firstLine;
+}
+
 // GET /api/track/:id
 app.get('/api/track/:id', async (req, res) => {
     const song = await getSongWithFiles(req.params.id);
@@ -33,7 +40,7 @@ app.post('/api/generate-blueprint', async (req, res) => {
         res.json(blueprint);
     } catch (err) {
         console.error('[/api/generate-blueprint]', err);
-        res.status(500).json({ error: 'Failed to generate song blueprint' });
+        res.status(500).json({ error: clientErrorMessage(err, 'Failed to generate song blueprint') });
     }
 });
 
@@ -65,7 +72,7 @@ app.post('/api/generate-section', async (req, res) => {
         sectionPrompt = await generateSectionPlan(payload);
     } catch (err) {
         console.error('[/api/generate-section] plan failed', err);
-        res.status(500).json({ error: 'Failed to generate section plan' }); return;
+        res.status(500).json({ error: clientErrorMessage(err, 'Failed to generate section plan') }); return;
     }
     const blueprint = payload.blueprint as SongBlueprint | undefined;
     const blueprintStyles = blueprint
@@ -91,7 +98,7 @@ app.post('/api/generate-section', async (req, res) => {
             res.status(err.status).json({ error: err.message, ...details }); return;
         }
         console.error('[/api/generate-section]', err);
-        res.status(500).json({ error: 'Failed to generate and save section' });
+        res.status(500).json({ error: clientErrorMessage(err, 'Failed to generate and save section') });
     }
 });
 
@@ -128,7 +135,7 @@ app.post('/api/generate', async (req, res) => {
             res.status(err.status).json({ error: err.message, ...details }); return;
         }
         console.error('[/api/generate]', err);
-        res.status(500).json({ error: 'Failed to generate and save' });
+        res.status(500).json({ error: clientErrorMessage(err, 'Failed to generate and save') });
     }
 });
 

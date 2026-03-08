@@ -3,7 +3,6 @@
  * ViewScriptRunner hydrates the client-side audio engine.
  */
 
-import { METRICS } from '@/lib/metrics';
 import { VIEW_MOODS, VIEW_LAYERS } from '@/lib/config';
 import ViewScriptRunner from '@/components/ViewScriptRunner';
 import ViewSpatialSpheres from '@/components/ViewSpatialSpheres';
@@ -210,7 +209,7 @@ export default function ViewPageContent() {
                             </div>
                         </div>
 
-                        {/* Right: visual options + metrics */}
+                        {/* Right: visual options */}
                         <aside className="viz-panel viz-panel--right" aria-label="Visual options">
                             <div className="viz-panel__header">
                                 <p className="viz-panel__title">Visual Options</p>
@@ -234,6 +233,14 @@ export default function ViewPageContent() {
                                         <dd>Longer bars mean stronger energy in that band.</dd>
                                         <dt>Beat Accent</dt>
                                         <dd>Adds an extra beat-synced flash layer.</dd>
+                                        <dt>Neon Glow</dt>
+                                        <dd>Boosts glow intensity around waves and bars.</dd>
+                                        <dt>Wave Trails</dt>
+                                        <dd>Adds a motion after-image for smoother movement.</dd>
+                                        <dt>Hue Drift</dt>
+                                        <dd>Slowly rotates color over time for evolving visuals.</dd>
+                                        <dt>Party Mode</dt>
+                                        <dd>Increases beat energy with stronger accents and rings.</dd>
                                     </dl>
                                 </div>
                             </div>
@@ -258,28 +265,28 @@ export default function ViewPageContent() {
                                 <input type="checkbox" className="viz-switch" id="smoothMode" />
                                 <span>Smooth Mode</span>
                             </label>
+                            <label className="viz-opt-toggle">
+                                <input type="checkbox" className="viz-switch" id="neonGlow" defaultChecked />
+                                <span>Neon Glow</span>
+                            </label>
+                            <label className="viz-opt-toggle">
+                                <input type="checkbox" className="viz-switch" id="waveTrails" defaultChecked />
+                                <span>Wave Trails</span>
+                            </label>
+                            <label className="viz-opt-toggle">
+                                <input type="checkbox" className="viz-switch" id="hueDrift" />
+                                <span>Hue Drift</span>
+                            </label>
+                            <label className="viz-opt-toggle">
+                                <input type="checkbox" className="viz-switch" id="partyMode" />
+                                <span>Party Mode</span>
+                            </label>
 
                             <div className="viz-pulse-wrap">
                                 <span className="viz-panel__title">Beat Pulse</span>
                                 <div className="viz-pulse-preview" id="vizPulsePreview" aria-hidden="true" />
                             </div>
 
-                            {!isXrTransparentView ? (
-                                <>
-                                    <p className="viz-panel__title">Metrics</p>
-                                    <div id="metrics" className="metrics">
-                                        {METRICS.map(({ key, label }) => (
-                                            <div key={key} className="metric-panel">
-                                                <div className="metric-panel__header">
-                                                    <span className="metric-label" data-metric={key}>{label}</span>
-                                                    <span className="metric-value" id={`val-${key}`}>0.00</span>
-                                                </div>
-                                                <canvas className="metric-graph" id={`graph-${key}`} width={400} height={60} />
-                                            </div>
-                                        ))}
-                                    </div>
-                                </>
-                            ) : null}
                         </aside>
 
                     </main>
