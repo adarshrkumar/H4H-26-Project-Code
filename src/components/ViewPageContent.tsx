@@ -183,10 +183,10 @@ export default function ViewPageContent() {
                                 <p className="viz-overlay__text">Choose a source above to begin</p>
                             </div>
                             <div className="viz-hint" id="vizHint">
-                                <p><strong>Spheres</strong> grow with bass, lowmid, mid, treble/high.</p>
+                                <p><strong>Wave Bands</strong> react separately to bass, low, mid, high, and treble.</p>
                             </div>
                             {isXrTransparentView && hasUserInteracted ? <ViewSpatialSpheres /> : null}
-                            <div className="viz-sphere-labels" aria-label="Sphere bands">
+                            <div className="viz-sphere-labels" aria-label="Wave band levels">
                                 <div className="viz-sphere-label" data-band="bass">
                                     <span className="viz-sphere-dot" aria-hidden="true" />
                                     <span className="viz-sphere-name">BASS</span>
@@ -228,19 +228,19 @@ export default function ViewPageContent() {
                                 <div className="viz-help-section">
                                     <p className="viz-help-heading">Quick guide</p>
                                     <dl className="viz-help-list">
-                                        <dt>Spheres</dt>
-                                        <dd>Each sphere matches one band: bass, lowmid, mid, treble/high.</dd>
+                                        <dt>Wave Bands</dt>
+                                        <dd>Each sine wave maps to one band: bass, low, mid, high, or treble.</dd>
                                         <dt>Bars</dt>
                                         <dd>Longer bars mean stronger energy in that band.</dd>
-                                        <dt>Spark Ring</dt>
-                                        <dd>Pulse effect on beat hits.</dd>
+                                        <dt>Beat Accent</dt>
+                                        <dd>Adds an extra beat-synced flash layer.</dd>
                                     </dl>
                                 </div>
                             </div>
 
                             <label className="viz-opt-toggle">
                                 <input type="checkbox" className="viz-switch" id="sparkRingToggle" defaultChecked />
-                                <span>Spark Ring</span>
+                                <span>Beat Accent</span>
                             </label>
                             <label className="viz-opt-toggle">
                                 <input type="checkbox" className="viz-switch" id="highContrast" />

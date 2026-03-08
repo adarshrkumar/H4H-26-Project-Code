@@ -1,0 +1,30 @@
+<svg width="1600" height="900" viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#050816"/>
+      <stop offset="100%" stop-color="#111437"/>
+    </linearGradient>
+    <linearGradient id="funnel" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#17d6ff"/>
+      <stop offset="100%" stop-color="#8d67ff"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#bg2)"/>
+  <text x="800" y="96" text-anchor="middle" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="52" font-weight="700">
+    Market Focus: TAM -> SAM -> SOM
+  </text>
+
+  <polygon points="240,210 1360,210 1240,350 360,350" fill="#10204f" stroke="url(#funnel)" stroke-width="4"/>
+  <polygon points="360,380 1240,380 1130,510 470,510" fill="#0f1b45" stroke="url(#funnel)" stroke-width="4"/>
+  <polygon points="470,540 1130,540 1020,670 580,670" fill="#0d173a" stroke="url(#funnel)" stroke-width="4"/>
+
+  <text x="800" y="290" text-anchor="middle" fill="#d7e8ff" font-family="Inter, Arial, sans-serif" font-size="40" font-weight="700">TAM: Accessible + Creator Audio Tooling</text>
+  <text x="800" y="450" text-anchor="middle" fill="#d7e8ff" font-family="Inter, Arial, sans-serif" font-size="36" font-weight="700">SAM: Education, Therapy, Creator Segments</text>
+  <text x="800" y="615" text-anchor="middle" fill="#d7e8ff" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="700">SOM (12 months): Paid Pilots + Pro Subscriptions</text>
+
+  <rect x="170" y="730" width="1260" height="110" rx="20" fill="#0b1335" stroke="#3a5fb2" stroke-width="2"/>
+  <text x="800" y="782" text-anchor="middle" fill="#9cc8ff" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="700">
+    Replace with your real numbers + source citations before presenting
+  </text>
+</svg>

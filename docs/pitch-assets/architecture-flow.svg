@@ -1,0 +1,76 @@
+<svg width="1600" height="900" viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#040814"/>
+      <stop offset="100%" stop-color="#0b1230"/>
+    </linearGradient>
+    <linearGradient id="box" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f1a44"/>
+      <stop offset="100%" stop-color="#121b53"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#15d3ff"/>
+      <stop offset="100%" stop-color="#7a63ff"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#35c8ff"/>
+    </marker>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <text x="800" y="92" text-anchor="middle" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="48" font-weight="700">
+    Huephonic End-to-End Architecture
+  </text>
+  <line x1="440" y1="116" x2="1160" y2="116" stroke="url(#accent)" stroke-width="5" filter="url(#glow)"/>
+
+  <rect x="90" y="230" width="250" height="170" rx="22" fill="url(#box)" stroke="#2f4e9c" stroke-width="2"/>
+  <text x="215" y="285" text-anchor="middle" fill="#9ec8ff" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="700">React App</text>
+  <text x="215" y="320" text-anchor="middle" fill="#d6e7ff" font-family="Inter, Arial, sans-serif" font-size="19">Compose + View UI</text>
+  <text x="215" y="350" text-anchor="middle" fill="#d6e7ff" font-family="Inter, Arial, sans-serif" font-size="19">Web Audio + Canvas</text>
+
+  <rect x="420" y="230" width="250" height="170" rx="22" fill="url(#box)" stroke="#2f4e9c" stroke-width="2"/>
+  <text x="545" y="285" text-anchor="middle" fill="#9ec8ff" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="700">Express API</text>
+  <text x="545" y="320" text-anchor="middle" fill="#d6e7ff" font-family="Inter, Arial, sans-serif" font-size="19">Validation + Routing</text>
+  <text x="545" y="350" text-anchor="middle" fill="#d6e7ff" font-family="Inter, Arial, sans-serif" font-size="19">Generation Orchestration</text>
+
+  <rect x="750" y="230" width="250" height="170" rx="22" fill="url(#box)" stroke="#2f4e9c" stroke-width="2"/>
+  <text x="875" y="285" text-anchor="middle" fill="#9ec8ff" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="700">AI + Audio</text>
+  <text x="875" y="320" text-anchor="middle" fill="#d6e7ff" font-family="Inter, Arial, sans-serif" font-size="19">Vercel AI SDK</text>
+  <text x="875" y="350" text-anchor="middle" fill="#d6e7ff" font-family="Inter, Arial, sans-serif" font-size="19">ElevenLabs Compose</text>
+
+  <rect x="1080" y="230" width="250" height="170" rx="22" fill="url(#box)" stroke="#2f4e9c" stroke-width="2"/>
+  <text x="1205" y="285" text-anchor="middle" fill="#9ec8ff" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="700">Storage + DB</text>
+  <text x="1205" y="320" text-anchor="middle" fill="#d6e7ff" font-family="Inter, Arial, sans-serif" font-size="19">UploadThing Files</text>
+  <text x="1205" y="350" text-anchor="middle" fill="#d6e7ff" font-family="Inter, Arial, sans-serif" font-size="19">Neon + Drizzle</text>
+
+  <line x1="340" y1="315" x2="420" y2="315" stroke="#35c8ff" stroke-width="4" marker-end="url(#arrow)"/>
+  <line x1="670" y1="315" x2="750" y2="315" stroke="#35c8ff" stroke-width="4" marker-end="url(#arrow)"/>
+  <line x1="1000" y1="315" x2="1080" y2="315" stroke="#35c8ff" stroke-width="4" marker-end="url(#arrow)"/>
+
+  <rect x="190" y="520" width="1220" height="250" rx="28" fill="#0a1338" stroke="#2f4e9c" stroke-width="2"/>
+  <text x="800" y="575" text-anchor="middle" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="700">
+    Business Flywheel
+  </text>
+  <text x="800" y="620" text-anchor="middle" fill="#d6e7ff" font-family="Inter, Arial, sans-serif" font-size="24">
+    Accessible creation -> Better engagement -> More creator output -> Institutional pilots -> Recurring revenue
+  </text>
+  <line x1="320" y1="680" x2="1280" y2="680" stroke="url(#accent)" stroke-width="6"/>
+  <circle cx="320" cy="680" r="11" fill="#1ee4ff"/>
+  <circle cx="560" cy="680" r="11" fill="#49b9ff"/>
+  <circle cx="800" cy="680" r="11" fill="#6d95ff"/>
+  <circle cx="1040" cy="680" r="11" fill="#8c78ff"/>
+  <circle cx="1280" cy="680" r="11" fill="#b85bff"/>
+
+  <text x="320" y="725" text-anchor="middle" fill="#cde3ff" font-family="Inter, Arial, sans-serif" font-size="19">Acquisition</text>
+  <text x="560" y="725" text-anchor="middle" fill="#cde3ff" font-family="Inter, Arial, sans-serif" font-size="19">Activation</text>
+  <text x="800" y="725" text-anchor="middle" fill="#cde3ff" font-family="Inter, Arial, sans-serif" font-size="19">Retention</text>
+  <text x="1040" y="725" text-anchor="middle" fill="#cde3ff" font-family="Inter, Arial, sans-serif" font-size="19">Pilots</text>
+  <text x="1280" y="725" text-anchor="middle" fill="#cde3ff" font-family="Inter, Arial, sans-serif" font-size="19">Revenue</text>
+</svg>

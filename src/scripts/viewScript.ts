@@ -513,11 +513,18 @@ export function initViewScript(): () => void {
     let audioMotion:     AudioMotionAnalyzer | null = null;
     let metricsAnalyser: AnalyserNode | null = null;
 
+    const ANALYZER_LATENCY = {
+        fftSize: 2048,
+        smoothing: 0.22,
+        metricsSmoothing: 0.16,
+    } as const;
+
     function initAudioMotion() {
         audioMotion?.destroy();
         audioMotion = new AudioMotionAnalyzer(amDiv, {
-            fftSize:         8192,
-            smoothing:       0.8,
+            // Lower FFT window + smoothing = faster visual response.
+            fftSize:         ANALYZER_LATENCY.fftSize,
+            smoothing:       ANALYZER_LATENCY.smoothing,
             connectSpeakers: false,
             onCanvasDraw:    renderFrame,
             start:           false,
@@ -525,7 +532,7 @@ export function initViewScript(): () => void {
         state.sampleRate = audioMotion.audioCtx.sampleRate;
         metricsAnalyser = audioMotion.audioCtx.createAnalyser();
         metricsAnalyser.fftSize = 2048;
-        metricsAnalyser.smoothingTimeConstant = 0.78;
+        metricsAnalyser.smoothingTimeConstant = ANALYZER_LATENCY.metricsSmoothing;
         audioMotion.start();
     }
     initAudioMotion();
@@ -550,7 +557,7 @@ export function initViewScript(): () => void {
     let beatEMA = 0, lastBeatTime = 0;
 
     function detectBeat(energy: number, now: number): boolean {
-        const alpha = vizState.smoothMode ? 0.05 : 0.1;
+        const alpha = vizState.smoothMode ? 0.08 : 0.18;
         beatEMA = beatEMA * (1 - alpha) + energy * alpha;
         const threshold = 1 + 0.6 * 0.8;
         if (energy > beatEMA * threshold && energy > 0.05 && now - lastBeatTime > 250) {
@@ -625,89 +632,185 @@ export function initViewScript(): () => void {
 
     let time = 0;
 
-    // 1. Background — iridescent radial gradient
+    // 1. Background — iridescent field (no central orb focus)
     function drawBackground(cx: number, cy: number, bands: ReturnType<typeof getBands>, hue: number) {
-        const L = vizState.highContrast ? 8 + bands.overall * 14 : 2 + bands.overall * 6;
-        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(cx, cy));
-        g.addColorStop(0,   `oklch(${L * 2.5}% 0.08 ${hue + bands.overall * 20})`);
-        g.addColorStop(0.5, `oklch(${L * 1.5}% 0.05 ${hue + 50})`);
-        g.addColorStop(1,   `oklch(${L}% 0.04 ${hue + 100})`);
+        const L = vizState.highContrast ? 11 + bands.overall * 18 : 4 + bands.overall * 9;
+        const g = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+        g.addColorStop(0,   `oklch(${L * 1.9}% 0.09 ${hue + 30})`);
+        g.addColorStop(0.5, `oklch(${L * 1.5}% 0.07 ${hue + 120})`);
+        g.addColorStop(1,   `oklch(${L * 1.3}% 0.08 ${hue + 210})`);
         ctx.fillStyle = g;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Side glows provide depth while keeping the center unobstructed.
+        const leftGlow = ctx.createRadialGradient(0, cy, 0, 0, cy, canvas.width * 0.55);
+        leftGlow.addColorStop(0, `oklch(${L * 2.6}% 0.18 ${hue + 20} / 0.18)`);
+        leftGlow.addColorStop(1, `oklch(${L * 1.1}% 0.04 ${hue + 70} / 0)`);
+        ctx.fillStyle = leftGlow;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        const rightGlow = ctx.createRadialGradient(canvas.width, cy, 0, canvas.width, cy, canvas.width * 0.55);
+        rightGlow.addColorStop(0, `oklch(${L * 2.7}% 0.20 ${hue + 180} / 0.16)`);
+        rightGlow.addColorStop(1, `oklch(${L * 1.2}% 0.04 ${hue + 240} / 0)`);
+        ctx.fillStyle = rightGlow;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
-    // 2. Beat flash — iridescent rainbow vignette from center
+    // 2. Beat accent — full-canvas diagonal flash
     function drawBeatFlash(W: number, H: number, hue: number) {
         if (beatFlashAlpha <= 0) return;
-        const cx    = W / 2, cy = H / 2;
-        const flash = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(cx, cy) * 1.3);
+        const flash = ctx.createLinearGradient(0, 0, W, H);
         const a     = beatFlashAlpha;
-        flash.addColorStop(0,    `oklch(96% 0.44 ${hue}        / ${a})`);
-        flash.addColorStop(0.25, `oklch(88% 0.38 ${hue + 60}   / ${a * 0.65})`);
-        flash.addColorStop(0.55, `oklch(78% 0.30 ${hue + 130}  / ${a * 0.30})`);
-        flash.addColorStop(0.8,  `oklch(68% 0.22 ${hue + 200}  / ${a * 0.10})`);
-        flash.addColorStop(1,    `oklch(58% 0.14 ${hue + 260}  / 0)`);
+        flash.addColorStop(0,   `oklch(86% 0.36 ${hue + 25}  / ${a * 0.20})`);
+        flash.addColorStop(0.5, `oklch(90% 0.44 ${hue + 120} / ${a * 0.32})`);
+        flash.addColorStop(1,   `oklch(82% 0.30 ${hue + 210} / ${a * 0.18})`);
         ctx.fillStyle = flash;
         ctx.fillRect(0, 0, W, H);
     }
 
-    // 3. Breathing circle — the main visual focus
-    function drawBreathingCircle(cx: number, cy: number, bands: ReturnType<typeof getBands>, hue: number) {
-        const openSize    = 128;
-        const breathFloor = 128;
-        const r           = breathFloor * (1 - beatFlashAlpha) + openSize * beatFlashAlpha;
-        const L           = vizState.highContrast ? 55 + bands.overall * 22 : 30 + bands.overall * 32;
-        const lw          = (3 + bands.overall * 8) * (vizState.highContrast ? 1.6 : 1);
+    const CIRCLE_BANDS = ['ground', 'flow', 'form', 'spark', 'air'] as const;
+    type CircleBand = typeof CIRCLE_BANDS[number];
 
-        if (beatFlashAlpha > 0.01) {
-            const glow  = ctx.createRadialGradient(cx, cy, r * 0.3, cx, cy, r * 1.9);
-            const glowE = bands.overall;
-            glow.addColorStop(0,    `oklch(${L + 18}% 0.42 ${hue + glowE * 30}       / 0.50)`);
-            glow.addColorStop(0.35, `oklch(${L + 8}%  0.34 ${hue + 80 + glowE * 20}  / 0.22)`);
-            glow.addColorStop(0.7,  `oklch(${L}%      0.24 ${hue + 160}              / 0.08)`);
-            glow.addColorStop(1,    `oklch(${L - 8}%  0.14 ${hue + 220}              / 0)`);
+    const circleBandState: Record<CircleBand, number> = {
+        ground: 0,
+        flow:   0,
+        form:   0,
+        spark:  0,
+        air:    0,
+    };
+
+    type DspFilterPreset = {
+        attackMs: number;
+        releaseMs: number;
+        noiseFloor: number;
+    };
+
+    const DSP_FILTER_PRESET: Record<'lowLatency' | 'smooth', DspFilterPreset> = {
+        lowLatency: { attackMs: 8,  releaseMs: 34,  noiseFloor: 0.0030 },
+        smooth:     { attackMs: 32, releaseMs: 120, noiseFloor: 0.0020 },
+    };
+
+    let lastCircleFilterTs = performance.now();
+
+    // One-pole envelope follower: fast attack + slower release for low-latency DSP response.
+    function followEnvelope(current: number, input: number, dtMs: number, preset: DspFilterPreset) {
+        const attackCoef = Math.exp(-dtMs / preset.attackMs);
+        const releaseCoef = Math.exp(-dtMs / preset.releaseMs);
+        const coef = input > current ? attackCoef : releaseCoef;
+        return input + (current - input) * coef;
+    }
+
+    function updateCircleBandState(bands: ReturnType<typeof getBands>, nowMs: number) {
+        const dtMsRaw = nowMs - lastCircleFilterTs;
+        const dtMs = Number.isFinite(dtMsRaw) ? Math.min(80, Math.max(8, dtMsRaw)) : 16;
+        lastCircleFilterTs = nowMs;
+        const preset = vizState.smoothMode ? DSP_FILTER_PRESET.smooth : DSP_FILTER_PRESET.lowLatency;
+        for (const band of CIRCLE_BANDS) {
+            const input = bands[band] < preset.noiseFloor ? 0 : bands[band];
+            circleBandState[band] = Math.max(0, Math.min(1,
+                followEnvelope(circleBandState[band], input, dtMs, preset),
+            ));
+        }
+    }
+
+    // 3. Multi-lane sine waves — separated by frequency band
+    const SINE_WAVE_LANES: Array<{
+        band: CircleBand;
+        label: string;
+        hueShift: number;
+        cycles: number;
+        speed: number;
+        phase: number;
+    }> = [
+        { band: 'ground', label: 'BASS',   hueShift: 0,   cycles: 1.35, speed: 0.86, phase: 0.1 },
+        { band: 'flow',   label: 'LOW',    hueShift: 30,  cycles: 1.60, speed: 1.00, phase: 0.9 },
+        { band: 'form',   label: 'MID',    hueShift: 85,  cycles: 1.95, speed: 1.24, phase: 1.7 },
+        { band: 'spark',  label: 'HIGH',   hueShift: 145, cycles: 2.40, speed: 1.58, phase: 2.6 },
+        { band: 'air',    label: 'TREBLE', hueShift: 205, cycles: 2.90, speed: 1.95, phase: 3.5 },
+    ];
+
+    function drawBandSineWaves(W: number, H: number, hue: number) {
+        const laneCount = SINE_WAVE_LANES.length;
+        const leftX     = Math.max(120, W * 0.14);
+        const rightX    = Math.min(W - 120, W * 0.86);
+        const width     = Math.max(200, rightX - leftX);
+        const topY      = H * 0.28;
+        const bottomY   = H * 0.72;
+        const spacing   = laneCount > 1 ? (bottomY - topY) / (laneCount - 1) : 0;
+        const segments  = vizState.reduceMotion ? 110 : 220;
+        const bandLabelX = leftX - 12;
+        const tSec      = time;
+
+        ctx.font = '700 11px system-ui';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+
+        for (let laneIndex = 0; laneIndex < laneCount; laneIndex++) {
+            const lane = SINE_WAVE_LANES[laneIndex];
+            const level = circleBandState[lane.band];
+            if (level <= 0.0006) continue;
+
+            const laneY      = topY + laneIndex * spacing;
+            const laneHue    = hue + lane.hueShift;
+            const ampBase    = vizState.reduceMotion ? 3.5 : 6;
+            const amplitude  = ampBase + level * (vizState.highContrast ? 54 : 44);
+            const waveCycles = lane.cycles + level * 0.9;
+            const waveSpeed  = lane.speed * (vizState.reduceMotion ? 0.45 : 1);
+            const phase      = tSec * waveSpeed + lane.phase;
+            const lineWidth  = (1.9 + level * 4.4) * (vizState.highContrast ? 1.3 : 1);
+            const lum        = vizState.highContrast ? 64 + level * 30 : 44 + level * 34;
+
+            const getY = (xFrac: number) => {
+                const theta = xFrac * Math.PI * 2 * waveCycles + phase;
+                const primary = Math.sin(theta) * amplitude;
+                const secondary = Math.sin(theta * 0.5 + phase * 0.8) * amplitude * 0.25;
+                return laneY + primary + secondary;
+            };
+
+            const grad = ctx.createLinearGradient(leftX, laneY, rightX, laneY);
+            grad.addColorStop(0, `oklch(${lum - 8}% 0.30 ${laneHue})`);
+            grad.addColorStop(0.5, `oklch(${lum + 8}% 0.40 ${laneHue + 55})`);
+            grad.addColorStop(1, `oklch(${lum + 2}% 0.35 ${laneHue + 115})`);
+
             ctx.beginPath();
-            ctx.arc(cx, cy, r * 1.9, 0, Math.PI * 2);
-            ctx.fillStyle = glow;
-            ctx.fill();
-        }
-
-        const roughness = vizState.running ? (bands.spark + bands.air) * 0.5 * 240 : 0;
-        ctx.beginPath();
-        if (roughness > 0.25) {
-            const segs = 120;
-            for (let i = 0; i <= segs; i++) {
-                const angle = (i / segs) * Math.PI * 2;
-                const noise = (
-                    Math.sin(angle * 6  + time * 5)  * 0.60 +
-                    Math.sin(angle * 13 + time * 8)  * 0.55 +
-                    Math.sin(angle * 23 + time * 13) * 0.35
-                ) * roughness;
-                const rr = r + noise;
-                const x  = cx + Math.cos(angle) * rr;
-                const y  = cy + Math.sin(angle) * rr;
-                if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            for (let i = 0; i <= segments; i++) {
+                const frac = i / segments;
+                const x = leftX + frac * width;
+                const y = getY(frac);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
             }
-            ctx.closePath();
-        } else {
-            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+
+            ctx.save();
+            ctx.globalAlpha = 0.24 + level * 0.24;
+            ctx.strokeStyle = `oklch(${lum + 10}% 0.42 ${laneHue + 35})`;
+            ctx.lineWidth = lineWidth * 2.2;
+            ctx.stroke();
+            ctx.restore();
+
+            ctx.strokeStyle = grad;
+            ctx.lineWidth = lineWidth;
+            ctx.stroke();
+
+            if (!vizState.reduceMotion) {
+                const sweep = (tSec * (0.12 + laneIndex * 0.018) + laneIndex * 0.17) % 1;
+                const tipX = leftX + sweep * width;
+                const tipY = getY(sweep);
+                const tipGlow = ctx.createRadialGradient(tipX, tipY, 0, tipX, tipY, 22 + level * 30);
+                tipGlow.addColorStop(0, `oklch(96% 0.46 ${laneHue + 90} / ${0.70 + level * 0.24})`);
+                tipGlow.addColorStop(1, `oklch(${lum}% 0.24 ${laneHue + 140} / 0)`);
+                ctx.beginPath();
+                ctx.arc(tipX, tipY, 16 + level * 14, 0, Math.PI * 2);
+                ctx.fillStyle = tipGlow;
+                ctx.fill();
+            }
+
+            ctx.fillStyle = `oklch(${lum - 16}% 0.14 ${laneHue + 10})`;
+            ctx.fillText(lane.label, bandLabelX, laneY);
         }
 
-        const cos = Math.cos(time * 0.4);
-        const sin = Math.sin(time * 0.4);
-        const sg  = ctx.createLinearGradient(cx - r * cos, cy - r * sin, cx + r * cos, cy + r * sin);
-        sg.addColorStop(0,    `oklch(${L}%      0.38 ${hue})`);
-        sg.addColorStop(0.33, `oklch(${L + 14}% 0.46 ${hue + 70})`);
-        sg.addColorStop(0.67, `oklch(${L + 8}%  0.42 ${hue + 140})`);
-        sg.addColorStop(1,    `oklch(${L + 20}% 0.50 ${hue + 210})`);
-        ctx.strokeStyle = sg;
-        ctx.lineWidth   = lw;
-        ctx.stroke();
-
-        ctx.globalAlpha = 0.12;
-        ctx.fillStyle   = `oklch(${L}% 0.32 ${hue})`;
-        ctx.fill();
-        ctx.globalAlpha = 1;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'alphabetic';
     }
 
     // 4. Frequency bars — iridescent with peak hold, shimmer, tip burst
@@ -875,6 +978,7 @@ export function initViewScript(): () => void {
             ? (COLORBLIND_MAP[currentMoodId] ?? vizState.moodHue)
             : vizState.moodHue;
         const bands = getBands();
+        updateCircleBandState(bands, now);
         const levels = updateSphereLabels(bands);
 
         // Advance beat grid slot
@@ -884,11 +988,10 @@ export function initViewScript(): () => void {
             lastGridAdvance = now;
         }
 
-        // Beat → flash + grid + ring (use metricsAnalyser energy — same source as the metrics panel)
+        // Beat → accent flash + grid (use metricsAnalyser energy — same source as the metrics panel)
         if (detectBeat(metricsEnergy > 0 ? metricsEnergy : bands.overall, now)) {
-            if (!vizState.reduceMotion) beatFlashAlpha = 1;
+            if (!vizState.reduceMotion && vizState.sparkRingEnabled) beatFlashAlpha = 1;
             beatGrid[beatGridIdx] = true;
-            if (!vizState.reduceMotion) spawnPulseRing(cx, cy, hue);
         }
         if (beatFlashAlpha > 0) beatFlashAlpha = Math.max(0, beatFlashAlpha - 0.03);
 
@@ -913,8 +1016,7 @@ export function initViewScript(): () => void {
             }
         }
         drawFrequencyBars(W, H, bands, hue);
-        drawBreathingCircle(cx, cy, bands, hue);
-        drawPulseRings(cx, cy, hue);
+        drawBandSineWaves(W, H, hue);
 
         if (pulsePreview) {
             pulsePreview.style.transform = `scale(${1 + bands.overall * 0.5})`;
@@ -1027,7 +1129,7 @@ export function initViewScript(): () => void {
             audioMotion!.connectInput(bufferSource);
             bufferSource.connect(actx.destination);
             if (metricsAnalyser) bufferSource.connect(metricsAnalyser);
-            bufferSource.start(actx.currentTime + 0.2);
+            bufferSource.start(actx.currentTime + 0.05);
             bufferSource.onended = () => {
                 try {
                     audioMotion?.disconnectInput(bufferSource!);
